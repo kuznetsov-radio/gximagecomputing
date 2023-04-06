@@ -1,6 +1,6 @@
 This code computes the 2D maps of the solar gyroresonance and free-free microwave emission using the models of active regions created by the GX Simulator. The code is called from IDL (requires the SolarSoft package).
 
-To compute the emission maps, you firstly need to create the input data blocks by calling the following functions (in any order):
+To compute the emission maps, you firstly need to create the input data blocks by calling the following functions:
 
 1. Load the GX Simulator model:<br/>
    model=LoadGXmodel(modelfile)<br/>
@@ -30,4 +30,6 @@ To compute the emission maps, you firstly need to create the input data blocks b
    outspace=ReserveOutputSpace(simbox)<br/>
    where simbox is the structure returned by the MakeSimulationBox function.
    
-Now
+When the input data are ready, the computation is performed by calling the main executable module (RenderX.dll or RenderX.so) via the call_external function:<br/>
+r=call_external(libname, 'ComputeMW', model, ebtel, simbox, coronaparms, outspace)<br/>
+where libname is the name of the appropriate executable library, and model, ebtel, simbox, coronaparms, and outspace are the structures returned by the above-mentioned functions.
