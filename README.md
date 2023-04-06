@@ -38,6 +38,6 @@ where libname is the name of the appropriate executable library, and model, ebte
 
 The output structure outspace contains the fields outspace.TI and outspace.TV, which represent the brightness temperatures corresponding to the Stokes parameters I and V of the computed emission (in K). Each field is a 3D array with Nx * Ny * Nf elements, where Nx and Ny are the x and y sizes of the computed maps, and Nf is the number of the emission frequencies. These data can be processed directly, or can be converted into the SolarSoft map objects via the procedure<br/>
 ConvertToMaps, outspace, simbox, model, mapI, mapV<br/>
-where the input parameters outspace, simbox, and model are the structures returned by the above-mentioned functions, and the output parameters mapI and mapV are the resulting SolarSoft (multi-frequency) map objects which represents the brightness temperatures corresponding to the Stokes parameters I and V of the computed emission (in K).
+where the input parameters outspace, simbox, and model are the structures returned by the above-mentioned functions, and the output parameters mapI and mapV are the resulting SolarSoft (multi-frequency) map objects which represent the brightness temperatures corresponding to the Stokes parameters I and V of the computed emission (in K).
 
 An example of using the code is given in the file /idl/RenderExample.pro (the sample GX Simulator model and EBTEL data are not included).
