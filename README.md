@@ -16,6 +16,10 @@ To compute the emission maps, you firstly need to create the input data blocks b
    where:<br/>
    xc and yc are the x and y coordinates of the map center (in the helioprojective coordinate system, in arcseconds);<br/>
    dx and dy are the x and y resolutions of the map (in arcseconds);<br/>
-   Nx and Ny are the x and y sizes of the map (in pixels).
+   Nx and Ny are the x and y sizes of the map (in pixels);<br/>
+   freqlist is the list (1D array) of the emission frequencies (in GHz) where the maps are to be computed.
    
-4. *
+4. Define the parameters of the coronal plasma:<br/>
+   coronaparms=DefineCoronaParams(Tbase, nbase, Q0, a, b [, /force_isothermal])<br/>
+   where:<br/>
+   Tbase and nbase are respectively the temperature (in K) and density (in cm^{-3})
