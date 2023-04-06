@@ -34,4 +34,8 @@ When the input data are ready, the computation is performed by calling the main 
 r=call_external(libname, 'ComputeMW', model, ebtel, simbox, coronaparms, outspace)<br/>
 where libname is the name of the appropriate executable library, and model, ebtel, simbox, coronaparms, and outspace are the structures returned by the above-mentioned functions.
 
-The output structure outspace contains the fields outspace.TI and outspace.TV, which represents the brightness temperatures corresponding to the Stokes parameters I and V of the computed emission (in K). Each field is a 3D array with Nx * Ny * Nf elements
+The output structure outspace contains the fields outspace.TI and outspace.TV, which represents the brightness temperatures corresponding to the Stokes parameters I and V of the computed emission (in K). Each field is a 3D array with Nx*Ny*Nf elements, where Nx and Ny are the x and y sizes of the computed maps, and Nf is the number of the emission frequencies. These data can be processed directly, or can be converted into the SolarSoft map objects via the procedure<br/>
+ConvertToMaps, outspace, simbox, model, mapI, mapV<br/>
+where the input parameters outspace, simbox, and model are the structures returned by the above-mentioned functions, and the output parameters mapI and mapV are the resulting SolarSoft (multi-frequency) map objects which represents the brightness temperatures corresponding to the Stokes parameters I and V of the computed emission (in K).
+
+An example of using the code is given in the file /idl/RenderExample.pro (the sample model and EBTEL data are not included).
