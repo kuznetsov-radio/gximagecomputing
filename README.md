@@ -33,3 +33,5 @@ To compute the emission maps, you firstly need to create the input data blocks b
 When the input data are ready, the computation is performed by calling the main executable module (RenderX.dll or RenderX.so) via the call_external function:<br/>
 r=call_external(libname, 'ComputeMW', model, ebtel, simbox, coronaparms, outspace)<br/>
 where libname is the name of the appropriate executable library, and model, ebtel, simbox, coronaparms, and outspace are the structures returned by the above-mentioned functions.
+
+The output structure outspace contains the fields outspace.TI and outspace.TV, which represents the brightness temperatures corresponding to the Stokes parameters I and V of the computed emission (in K). Each field is a 3D array with Nx * Ny * Nf elements
