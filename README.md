@@ -3,4 +3,5 @@ This code computes the 2D maps of the solar gyroresonance and free-free microwav
 To compute the emission maps, you firstly need to create the input data blocks by calling the following functions:
 
 1. Load the GX Simulator model:
-model=LoadGXmodel(modelfile)
+
+   model=LoadGXmodel(modelfile)
