@@ -10,3 +10,12 @@ To compute the emission maps, you firstly need to create the input data blocks b
    ebtel=LoadEBTEL(ebtelfile)<br/>
    where ebtelfile is the name of the GX Simulator file containing the EBTEL table that defines the DEM and/or DDM.<br/> 
    If ebtelfile='' then the DEM, DDM, and coronal heating model are not used, and the coronal plasma is described by a model with a constant temperature and a barometric height profile of the plasma density (see below).
+
+3. Define the size and position of the required radio maps, as well as the emission frequencies:<br/>
+   simbox=MakeSimulationBox(xc, yc, dx, dy, Nx, Ny, freqlist)
+   where:
+   xc and yc are the x and y coordinates of the map center (in arcseconds);
+   dx and dy are the x and y resolutions of the map (in arcseconds);
+   Nx and Ny are the x and y sizes of the map (in pixels).
+   
+4. *
