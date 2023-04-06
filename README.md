@@ -22,4 +22,5 @@ To compute the emission maps, you firstly need to create the input data blocks b
 4. Define the parameters of the coronal plasma:<br/>
    coronaparms=DefineCoronaParams(Tbase, nbase, Q0, a, b [, /force_isothermal])<br/>
    where:<br/>
-   Tbase and nbase are respectively the temperature (in K) and density (in cm^{-3})
+   Tbase and nbase define the "default" plasma distribution; they are respectively the plasma temperature (in K) and the base plasma density at the bottom of the simulation box (in cm^{-3}). These parameters are used to find the plasma parameters in the voxels where the heating model is not applicable, i.e., either the voxel is associated with an open field line, or the heating parameters are beyond the EBTEL table. In such voxels, the plasma temperature is set to Tbase, and the plasma density is computed using nbase, Tbase, and the barometric formula.<br/>
+   Q0, a, and b define the coronal heating model (which is applied to the closed field lines).
