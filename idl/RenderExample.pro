@@ -24,6 +24,9 @@ pro RenderExample
  Q0=4.5d-3
  a=1.5
  b=2.5
+ 
+ setenv, 'OMP_NUM_THREADS=8'
+ ;may be needed on Linux systems; specify here the required/allowed number of parallel threads
            
  forward_function LoadGXmodel, LoadEBTEL, MakeSimulationBox, DefineCoronaParams, ReserveOutputSpace
  
