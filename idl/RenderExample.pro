@@ -1,9 +1,9 @@
 pro RenderExample
  ;GX model:
- modelfile='C:\gx_models\2022-01-30\hmi.M_720s.20220130_041031.W115N18CR.CEA.NAS.CHR.sav'
+ modelfile='C:\MCloud\CoronalMW\AR-SRH\Data\Models\model20220130_0415.sav'
  
  ;file with EBTEL table (can be '' if DEM, DDM and heating model are not needed):
- ebtelfile='C:\ssw\packages\gx_simulator\userslib\aia\ebtel\ebtel.sav'
+ ebtelfile='C:\MCloud\CoronalMW\AR-SRH\Data\ebtel\ebtelDEM.sav'
   
  ;window parameters:
  xc=-50.0
@@ -24,9 +24,6 @@ pro RenderExample
  Q0=4.5d-3
  a=1.5
  b=2.5
- 
- setenv, 'OMP_NUM_THREADS=8'
- ;may be needed on Linux systems; specify here the required/allowed number of parallel threads
            
  forward_function LoadGXmodel, LoadEBTEL, MakeSimulationBox, DefineCoronaParams, ReserveOutputSpace
  
