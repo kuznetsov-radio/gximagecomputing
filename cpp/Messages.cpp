@@ -1,5 +1,8 @@
 #include <stdarg.h>
 #include <stdio.h>
+
+/*
+
 #include <idl_export.h>
 
 void IDLmsg(const char *fmt, ...)
@@ -13,6 +16,8 @@ void IDLmsg(const char *fmt, ...)
 
  IDL_Message(IDL_M_GENERIC, IDL_MSG_INFO, arr);
 }
+
+*/
 
 int LOGinit=0;
 char LOGname[32];

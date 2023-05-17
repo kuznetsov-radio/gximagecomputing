@@ -1,7 +1,6 @@
 #include <stdlib.h>
 #include <math.h>
 #include <memory.h>
-//#include "Messages.h"
 #include "IDLinterface.h"
 #include "Plasma.h"
 #include "ExtMath.h"
@@ -474,7 +473,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 #ifndef LINUX
 extern "C" __declspec(dllexport) int ComputeMW(int argc, void **argv)
 #else
-extern "C" double ComputeMW(int argc, void **argv)
+extern "C" int ComputeMW(int argc, void **argv)
 #endif
 {
  __int32 *m32=(__int32*)argv[0];
@@ -545,4 +544,21 @@ extern "C" double ComputeMW(int argc, void **argv)
  free(flags);
 
  return 0;
+}
+
+#ifndef LINUX
+extern "C" __declspec(dllexport) int pyComputeMW(void *model, void *ebtel, void *simbox, void *cparms, void *out)
+#else
+extern "C" int pyComputeMW(void* model, void* ebtel, void* simbox, void* cparms, void* out)
+#endif
+{
+ void *ARGV[5];
+
+ ARGV[0]=model;
+ ARGV[1]=ebtel;
+ ARGV[2]=simbox;
+ ARGV[3]=cparms;
+ ARGV[4]=out;
+
+ return ComputeMW(5, ARGV);
 }

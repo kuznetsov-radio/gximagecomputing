@@ -8,7 +8,6 @@
 #include "FF.h"
 #include "Neutrals.h"
 #include "GR.h"
-#include "Messages.h"
 
 #define InSize 15
 #define OutSize 7
@@ -570,11 +569,7 @@ extern "C" int GET_MW(int argc, void **argv)
   free(Parms);
 
  }
- else
- {
-  IDLmsg("GET_MW error: incorrect number of parameters in the function call.");
-  res=-1;
- }
+ else res=-1;
 
  return res;
 }
