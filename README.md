@@ -40,4 +40,4 @@ The output structure outspace contains the fields outspace.TI and outspace.TV, w
 ConvertToMaps, outspace, simbox, model, mapI, mapV<br/>
 where the input parameters outspace, simbox, and model are the structures returned by the above-mentioned functions, and the output parameters mapI and mapV are the resulting SolarSoft (multi-frequency) map objects which represent the brightness temperatures corresponding respectively to the Stokes parameters I and V of the computed emission (in K).
 
-An example of using the code is given in the file /idl/RenderExample.pro (the sample GX Simulator model and EBTEL data are not included).
+An example of using the code is given in the file /examples/RenderExample.pro (the sample GX Simulator model and EBTEL data are not included).
