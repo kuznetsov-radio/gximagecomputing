@@ -32,7 +32,7 @@ To compute the emission maps, you firstly need to create the input data blocks b
    outspace=ReserveOutputSpace(simbox)<br/>
    where simbox is the structure returned by the MakeSimulationBox function.
    
-When the input data are ready, the computation is performed by calling the main executable module (RenderX_32.dll, RenderX_64.dll, or RenderX.so) via the call_external function:<br/>
+When the input data are ready, the computation is performed by calling the main executable module (RenderGRFF_32.dll, RenderGRFF_64.dll, or RenderGRFF.so) via the call_external function:<br/>
 r=call_external(libname, 'ComputeMW', model, ebtel, simbox, coronaparms, outspace)<br/>
 where libname is the name of the appropriate executable library, and model, ebtel, simbox, coronaparms, and outspace are the structures returned by the above-mentioned functions.
 
