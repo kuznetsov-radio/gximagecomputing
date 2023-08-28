@@ -66,7 +66,7 @@ dt_o=np.dtype([('flagsAll', np.int32, 6),
                ('TV', np.float64, (Nx, Ny, len(freqlist)))])
 outspace=np.zeros(1, dtype=dt_o)
 
-libname='.\RenderX_64.dll'
+libname='.\RenderGRFF_64.dll'
 libc_mw=ctypes.CDLL(libname)
 mwfunc=libc_mw.pyComputeMW
 _dt_s=np.ctypeslib.ndpointer(dtype=dt_s)

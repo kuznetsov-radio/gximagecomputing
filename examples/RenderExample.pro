@@ -34,7 +34,8 @@ pro RenderExample
  outspace=ReserveOutputSpace(simbox)
  
  tm=systime(1)
- r=call_external('RenderX_64.dll', 'ComputeMW', model, ebtel, simbox, coronaparms, outspace)
+ r=call_external('C:\MCloud\CoronalMW\AR-SRH\RenderX\x64\Release\RenderGRFF_64.dll', 'ComputeMW', $
+                 model, ebtel, simbox, coronaparms, outspace)
  print, 'Elapsed time: ', systime(1)-tm, ' s'                  
  
  ConvertToMaps, outspace, simbox, model, mapI, mapV
