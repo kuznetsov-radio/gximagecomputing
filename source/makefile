@@ -1,5 +1,5 @@
-RenderX			:	Coulomb.o DEM.o ExtMath.o FF.o GR.o MWtransfer.o Neutrals.o Plasma.o RenderIrregular.o Rmain.o Zeta.o
-				g++ $^ -shared -fopenmp -o RenderX.so
+RenderGRFF		:	Coulomb.o DEM.o ExtMath.o FF.o GR.o MWtransfer.o Neutrals.o Plasma.o RenderIrregular.o Rmain.o Zeta.o
+				g++ $^ -shared -fopenmp -o RenderGRFF.so
 Coulomb.o		:	Coulomb.cpp Coulomb.h DEM.h ExtMath.h FF.h GR.h IDLinterface.h MWtransfer.h Neutrals.h Plasma.h RenderIrregular.h Zeta.h
 				g++ -c -std=c++11 -O3 -fPIC -fopenmp -D LINUX Coulomb.cpp
 DEM.o			:	DEM.cpp Coulomb.h DEM.h ExtMath.h FF.h GR.h IDLinterface.h MWtransfer.h Neutrals.h Plasma.h RenderIrregular.h Zeta.h

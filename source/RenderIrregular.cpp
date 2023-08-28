@@ -64,6 +64,10 @@ extern "C" int RENDER(int argc, void **argv)
  int *VoxList=(int*)argv[6]; 
  double *ds=(double*)argv[7];
 
+ double *xmid=(double*)argv[8];
+ double *ymid=(double*)argv[9];
+ double *zmid=(double*)argv[10];
+
  //------------------------------------------------------
 
  double *tmidarr=(double*)malloc(sizeof(double)*arrN);
@@ -224,6 +228,10 @@ extern "C" int RENDER(int argc, void **argv)
      VoxList[*Nvoxels]=r*Nx*Ny+j*Nx+i;
      ds[*Nvoxels]=fabs(tarr[r]-tarr[r+Nz])*L;
      tmidarr[*Nvoxels]=(tarr[r]+tarr[r+Nz])/2;
+
+     xmid[*Nvoxels]=x1+tmidarr[*Nvoxels]*bx;
+     ymid[*Nvoxels]=y1+tmidarr[*Nvoxels]*by;
+     zmid[*Nvoxels]=z1+tmidarr[*Nvoxels]*bz;
      
      (*Nvoxels)++; 
      if (*Nvoxels>=arrN) res=1;
@@ -239,6 +247,9 @@ extern "C" int RENDER(int argc, void **argv)
    arrswap(tmidarr, p, q);
    arrswap(VoxList, p, q);
    arrswap(ds, p, q);
+   arrswap(xmid, p, q);
+   arrswap(ymid, p, q);
+   arrswap(zmid, p, q);
   }
  }
 

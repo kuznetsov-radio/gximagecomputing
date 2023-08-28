@@ -31,6 +31,82 @@ void rotC(double *r, double lat, double lon)
  r[2]=r1[2]*clat+r1[1]*slat;
 }
 
+void InterpolateTrilinear(int Nx, int Ny, int Nz, double Dx, double Dy, double *zc_arr, 
+                          float *Bx_arr, float *By_arr, float *Bz_arr, double x, double y, double z,
+	                      double *Bx, double *By, double *Bz)
+{
+ double x_ind=x/Dx-0.5;
+ double y_ind=y/Dy-0.5;
+
+ int i1=min(max(int(x_ind), 0), Nx-2);
+ int i2=i1+1;
+ int j1=min(max(int(y_ind), 0), Ny-2);
+ int j2=j1+1;
+
+ double dx=x_ind-i1;
+ double dy=y_ind-j1;
+
+ double *zc_local=(double*)malloc(sizeof(double)*Nz);
+
+ for (int k=0; k<Nz; k++) zc_local[k]=zc_arr[D3(Nx, Ny, i1, j1, k)];
+ int k111=min(max(value_locate(zc_local, Nz, z), 0), Nz-2);
+ int k112=k111+1;
+ double dz11=(z-zc_local[k111])/(zc_local[k112]-zc_local[k111]);
+
+ for (int k=0; k<Nz; k++) zc_local[k]=zc_arr[D3(Nx, Ny, i1, j2, k)];
+ int k121=min(max(value_locate(zc_local, Nz, z), 0), Nz-2);
+ int k122=k121+1;
+ double dz12=(z-zc_local[k121])/(zc_local[k122]-zc_local[k121]);
+
+ for (int k=0; k<Nz; k++) zc_local[k]=zc_arr[D3(Nx, Ny, i2, j1, k)];
+ int k211=min(max(value_locate(zc_local, Nz, z), 0), Nz-2);
+ int k212=k211+1;
+ double dz21=(z-zc_local[k211])/(zc_local[k212]-zc_local[k211]);
+
+ for (int k=0; k<Nz; k++) zc_local[k]=zc_arr[D3(Nx, Ny, i2, j2, k)];
+ int k221=min(max(value_locate(zc_local, Nz, z), 0), Nz-2);
+ int k222=k221+1;
+ double dz22=(z-zc_local[k221])/(zc_local[k222]-zc_local[k221]);
+
+ free(zc_local);
+
+ double u111=(1.0-dx)*(1.0-dy)*(1.0-dz11);
+ double u211=dx*(1.0-dy)*(1.0-dz21);
+ double u121=(1.0-dx)*dy*(1.0-dz12);
+ double u112=(1.0-dx)*(1.0-dy)*dz11;
+ double u212=dx*(1.0-dy)*dz21;
+ double u122=(1.0-dx)*dy*dz12;
+ double u221=dx*dy*(1.0-dz22);
+ double u222=dx*dy*dz22;
+
+ *Bx=Bx_arr[D3(Nx, Ny, i1, j1, k111)]*u111+
+     Bx_arr[D3(Nx, Ny, i2, j1, k211)]*u211+
+     Bx_arr[D3(Nx, Ny, i1, j2, k121)]*u121+
+     Bx_arr[D3(Nx, Ny, i1, j1, k112)]*u112+
+     Bx_arr[D3(Nx, Ny, i2, j1, k212)]*u212+
+     Bx_arr[D3(Nx, Ny, i1, j2, k122)]*u122+
+     Bx_arr[D3(Nx, Ny, i2, j2, k221)]*u221+
+     Bx_arr[D3(Nx, Ny, i2, j2, k222)]*u222;
+
+ *By=By_arr[D3(Nx, Ny, i1, j1, k111)]*u111+
+     By_arr[D3(Nx, Ny, i2, j1, k211)]*u211+
+     By_arr[D3(Nx, Ny, i1, j2, k121)]*u121+
+     By_arr[D3(Nx, Ny, i1, j1, k112)]*u112+
+     By_arr[D3(Nx, Ny, i2, j1, k212)]*u212+
+     By_arr[D3(Nx, Ny, i1, j2, k122)]*u122+
+     By_arr[D3(Nx, Ny, i2, j2, k221)]*u221+
+     By_arr[D3(Nx, Ny, i2, j2, k222)]*u222;
+
+ *Bz=Bz_arr[D3(Nx, Ny, i1, j1, k111)]*u111+
+     Bz_arr[D3(Nx, Ny, i2, j1, k211)]*u211+
+     Bz_arr[D3(Nx, Ny, i1, j2, k121)]*u121+
+     Bz_arr[D3(Nx, Ny, i1, j1, k112)]*u112+
+     Bz_arr[D3(Nx, Ny, i2, j1, k212)]*u212+
+     Bz_arr[D3(Nx, Ny, i1, j2, k122)]*u122+
+     Bz_arr[D3(Nx, Ny, i2, j2, k221)]*u221+
+     Bz_arr[D3(Nx, Ny, i2, j2, k222)]*u222;
+}
+
 #define InSize 15
 #define OutSize 7
 #define Bavg0 100
@@ -131,7 +207,9 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  double cp_b=*(cp64++);
 
  __int32 *cp32=(__int32*)cp64;
- int force_isothermal=*cp32;
+ int cp_mode=*cp32;
+ int force_isothermal=(cp_mode & 1)!=0;
+ int interpolB=(cp_mode & 2)!=0;
 
  //-------------------------------------
 
@@ -214,6 +292,9 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  int Nvoxels=0;
  int *VoxList=(int*)malloc(arrN*sizeof(int));
  double *ds=(double*)malloc(arrN*sizeof(double));
+ double *xmid=(double*)malloc(arrN*sizeof(double));
+ double *ymid=(double*)malloc(arrN*sizeof(double));
+ double *zmid=(double*)malloc(arrN*sizeof(double));
 
  int Rdim[3];
  Rdim[0]=m_Nx;
@@ -238,7 +319,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 
  double *RL=(double*)malloc(OutSize*b_Nf*sizeof(double));
  
- void *ARGV[8];
+ void *ARGV[11];
 
  for (int i=i_start; i<=i_end; i++) for (int j=j_start; j<=j_end; j++)
  {
@@ -288,8 +369,11 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
   ARGV[5]=(void*)(&Nvoxels);
   ARGV[6]=(void*)VoxList;
   ARGV[7]=(void*)ds;
+  ARGV[8]=(void*)xmid;
+  ARGV[9]=(void*)ymid;
+  ARGV[10]=(void*)zmid;
 
-  int res=RENDER(8, ARGV);
+  int res=RENDER(11, ARGV);
 
   if (Nvoxels>0)
   {
@@ -399,14 +483,23 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 	 else flags[VoxList[k]]|=16; //EBTEL table miss (L)
 	}
 
-	Parms[D2(InSize, 3, k)]=sqrt(sqr(m_Bx[VoxList[k]])+sqr(m_By[VoxList[k]])+sqr(m_Bz[VoxList[k]])); //magnetic field
+	double Bx, By, Bz;
+	if (interpolB) InterpolateTrilinear(m_Nx, m_Ny, m_Nz, m_dx, m_dy, h, 
+                                        m_Bx, m_By, m_Bz, xmid[k], ymid[k], zmid[k],
+		                                &Bx, &By, &Bz);
+	else
+	{
+	 Bx=m_Bx[VoxList[k]];
+	 By=m_By[VoxList[k]];
+	 Bz=m_Bz[VoxList[k]];
+	}
+
+	Parms[D2(InSize, 3, k)]=sqrt(sqr(Bx)+sqr(By)+sqr(Bz)); //magnetic field
 	Parms[D2(InSize, 4, k)]=(Parms[D2(InSize, 3, k)]>0) ?
-		                    acos((m_Bx[VoxList[k]]*LOS[0]+m_By[VoxList[k]]*LOS[1]+m_Bz[VoxList[k]]*LOS[2])/
-                            Parms[D2(InSize, 3, k)])/M_PI*180 : 0; //viewing angle
+		                    acos((Bx*LOS[0]+By*LOS[1]+Bz*LOS[2])/Parms[D2(InSize, 3, k)])/M_PI*180 : 0; //viewing angle
     Parms[D2(InSize, 5, k)]=(Parms[D2(InSize, 3, k)]>0) ?
-		                    atan2(m_Bx[VoxList[k]]*norm_y[0]+m_By[VoxList[k]]*norm_y[1]+m_Bz[VoxList[k]]*norm_y[2], 
-                                  m_Bx[VoxList[k]]*norm_x[0]+m_By[VoxList[k]]*norm_x[1]+m_Bz[VoxList[k]]*norm_x[2])/
-                            M_PI*180 : 0; //azimuthal angle
+		                    atan2(Bx*norm_y[0]+By*norm_y[1]+Bz*norm_y[2], 
+                                  Bx*norm_x[0]+By*norm_x[1]+Bz*norm_x[2])/M_PI*180 : 0; //azimuthal angle
    }
 
    memset(RL, 0, OutSize*b_Nf*sizeof(double));
@@ -454,6 +547,9 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  if (DDM_arr) free(DDM_arr);
  if (DEM_arr) free(DEM_arr);
  free(Parms);
+ free(zmid);
+ free(ymid);
+ free(xmid);
  free(ds);
  free(VoxList);
  free(flags);
