@@ -1,21 +1,28 @@
+#!/usr/bin/env python3
+
 import ctypes
 import numpy as np
 import matplotlib.pyplot as plt
+import scipy.io as io
+from astropy.coordinates import SkyCoord
+from sunpy.coordinates import frames
+import astropy.units as u
+from astropy.time import Time
+import os
 
-f=open('model.bin', mode='rb')
-model=f.read()
-f.close()
+os.environ['OMP_NUM_THREADS']='8' # number of parallel threads
 
-f=open('ebtel.bin', mode='rb')
-ebtel=f.read()
-f.close()
+ebtel_file = "C:\MCloud\CoronalMW\AR-SRH\Data\ebtel\ebtelDEM.sav"
+model_file = "C:\MCloud\CoronalMW\AR-SRH\Data\Models\model20220130_0415.sav"
 
-Nx=150
-Ny=150
-xc=-50.0
-yc=390.0
-dx=2.0
-dy=2.0
+libname='..\CHpipeline\RenderGRFF_64.dll'
+
+box_Nx=150
+box_Ny=150
+box_xc=-50
+box_yc=390
+box_dx=2.0
+box_dy=2.0
 freqlist=[5.8, 6.2, 6.6, 7.0, 7.4, 7.8, 8.2, 8.6, 9.0, 9.4, 9.8, 10.2, 10.6, 11.0, 11.4, 11.8]
 
 Tbase=1e6
@@ -25,7 +32,172 @@ a=1.5
 b=2.5
 force_isothermal=1
 
-#------------------------------------------------
+def load_ebtel(ebtel_file):
+    ebtel_data = io.readsav(ebtel_file)
+    s = ebtel_data["lrun"].shape
+
+    ebtel_dtypes = [("DEM_on", np.int32),
+                    ("DDM_on", np.int32),
+                    ("NQ", np.int32),
+                    ("NL", np.int32),
+                    ("NT", np.int32),
+                    ("Qrun", np.float32, ebtel_data["qrun"].shape),
+                    ("Lrun", np.float32, ebtel_data["lrun"].shape),
+                    ("logtdem", np.float32, ebtel_data["logtdem"].size)
+                  ]
+    if "dem_cor_run" in ebtel_data.keys():
+        ebtel_dtypes.append(("DEM_cor_run", np.float32, ebtel_data["dem_cor_run"].shape))
+    
+    if "ddm_cor_run" in ebtel_data.keys():
+        ebtel_dtypes.append(("DDM_cor_run", np.float32, ebtel_data["ddm_cor_run"].shape))
+    
+    ebtel_dt = np.dtype(ebtel_dtypes)
+    ebtel_c = np.zeros(1, dtype=ebtel_dt)
+    
+    ebtel_c["DEM_on"] = 1 if "dem_cor_run" in ebtel_data.keys() else 0
+    ebtel_c["DDM_on"] = 1 if "ddm_cor_run" in ebtel_data.keys() else 0
+    ebtel_c["NQ"] = s[1]
+    ebtel_c["NL"] = s[0]
+    ebtel_c["NT"] = ebtel_data["logtdem"].size
+    ebtel_c["Qrun"] = np.float32(ebtel_data["qrun"])
+    ebtel_c["Lrun"] = np.float32(ebtel_data["lrun"])
+    ebtel_c["logtdem"] = np.float32(ebtel_data["logtdem"])
+    
+    if "dem_cor_run" in ebtel_data.keys():
+        ebtel_c["DEM_cor_run"] = np.float32(ebtel_data["DEM_cor_run"])
+    
+    if "ddm_cor_run" in ebtel_data.keys():
+        ebtel_c["DDM_cor_run"] = np.float32(ebtel_data["DDM_cor_run"])
+
+    return ebtel_c, ebtel_dt
+
+def load_model_sav(file_name):
+    model_data = io.readsav(file_name)
+    lon = model_data.box.index[0].CRVAL1[0]
+    lat = model_data.box.index[0].CRVAL2[0]
+
+    init_coords = SkyCoord(lon*u.deg, lat*u.deg, frame=frames.HeliographicCarrington,rsun=696000*u.km,\
+                       obstime=Time(model_data.box.index[0]["DATE_OBS"][0]), observer="earth")
+    hcc = init_coords.transform_to(frames.Heliocentric)
+    aptime = Time(model_data.box.index[0]["DATE_OBS"][0])
+    obstime = aptime.unix - 283996800 # according to IDL specs, anytim function
+
+    x, y, z = hcc.cartesian.x, hcc.cartesian.y, hcc.cartesian.z
+    xC, yC, zC = (c.to(u.cm).value for c in (x, y, z))
+    # Warning: the values xC, yC, zC slightly differ, because sunpy Heliocentric system is different from IDL
+
+    DSun = model_data.box.index[0]["DSUN_OBS"][0]*1e2
+    RSun = init_coords.rsun.to(u.cm).value
+    
+    lonC=np.rad2deg(np.arctan2(xC, zC))
+    latC=np.rad2deg(np.arcsin(yC/RSun))
+
+    dr = model_data.box.dr[0]
+
+    dx=dr[0]*RSun
+    dy=dr[1]*RSun
+    dz_uniform=dr[2]*RSun
+    dz=model_data.box.dz[0]*RSun
+
+    s = dz.shape
+    sc = model_data.box.bcube[0].shape
+    
+    Nx=s[2]
+    Ny=s[1]
+    Nz=s[0]
+
+    chromo_layers=model_data.box.chromo_layers[0]
+    corona_layers=Nz-chromo_layers
+    corona_base=model_data.box.corona_base[0]
+
+    Bx=np.zeros(s, dtype=np.float32, order="C")
+    By=np.zeros(s, dtype=np.float32, order="C")
+    Bz=np.zeros(s, dtype=np.float32, order="C")
+
+    chromo_bcube = model_data.box.chromo_bcube[0]
+    bcube = model_data.box.bcube[0]
+
+    Bx[0:chromo_layers, :, :]=chromo_bcube[0, :, :, :]
+    By[0:chromo_layers, :, :]=chromo_bcube[1, :, :, :]
+    Bz[0:chromo_layers, :, :]=chromo_bcube[2, :, :, :]
+
+    Bx[chromo_layers : Nz, :, :]=bcube[0, corona_base : Nz, :, :]
+    By[chromo_layers : Nz, :, :]=bcube[1, corona_base : Nz, :, :]
+    Bz[chromo_layers : Nz, :, :]=bcube[2, corona_base : Nz, :, :]
+
+    chr_s  = (chromo_layers,  Ny, Nx)
+    cor_s  = (sc[1]-corona_base, Ny, Nx)
+    cor_s2 = (corona_base,    Ny, Nx)
+
+    chromo_n0 =np.zeros(chr_s)
+    chromo_np =np.zeros(chr_s)
+    chromo_nHI=np.zeros(chr_s)
+    chromo_T0 =np.zeros(chr_s)
+
+    chromo_idx = model_data.box.chromo_idx[0]
+    chromo_n0.flat[chromo_idx] = model_data.box.chromo_n[0].flat
+    chromo_np.flat[chromo_idx] = model_data.box.n_p[0].flat
+    chromo_nHI.flat[chromo_idx]= model_data.box.n_hi[0].flat
+    chromo_T0.flat[chromo_idx] = model_data.box.chromo_t[0].flat
+
+    Q=np.zeros((Nx, Ny, sc[1]))
+
+    idx    = np.unravel_index(model_data.box.idx[0], Q.shape, order="F")
+    length = model_data.box.length[0]
+
+    Q[idx] = model_data.box.bmed[0]
+    corona_Bavg         = Q[:, :, corona_base : sc[1]].copy().T
+    chromo_uniform_Bavg = Q[:, :, 0 : corona_base].copy().T
+
+    Q[:, :, :]=0
+    Q[idx]=length*RSun
+    corona_L         = Q[:, :, corona_base : sc[1]].T
+    chromo_uniform_L = Q[:, :, 0 : corona_base].T
+
+    model_dt_varlist = [
+            ('Nx', np.int32),
+            ('Ny', np.int32),
+            ('Nz', np.int32),
+            ('chromo_layers', np.int32),
+            ('corona_layers', np.int32),
+            ('corona_base',   np.int32),
+            ('DSun', np.float64),
+            ('RSun', np.float64),
+            ('lonC', np.float64),
+            ('latC', np.float64),
+            ('dx',   np.float64),
+            ('dy',   np.float64),
+            ('dz_uniform', np.float64),
+            ('obstime',    np.float64),
+            ('dz', np.float32, s),
+            ('Bx', np.float32, s),
+            ('By', np.float32, s),
+            ('Bz', np.float32, s),
+            ('chromo_n0' ,  np.float32, chr_s),
+            ('chromo_np' ,  np.float32, chr_s),
+            ('chromo_nHI',  np.float32, chr_s),
+            ('chromo_T0',   np.float32, chr_s),
+            ('corona_Bavg', np.float32, cor_s),
+            ('corona_L',    np.float32, cor_s),
+            ('chromo_uniform_Bavg', np.float32, cor_s2),
+            ('chromo_uniform_L',    np.float32, cor_s2)]
+    
+    model_dt = np.dtype(model_dt_varlist)
+    model = np.zeros(1, dtype=model_dt)
+
+    for vars in model_dt_varlist:
+        k, dt = vars[0], vars[1]
+        print(k)
+        val = dt(locals()[k])
+        if len(val.shape) > 1:
+            model[k] = val.astype(dt, order="C")
+        else:
+            model[k] = val
+
+    return model, model_dt
+
+ebtel, ebtel_dt = load_ebtel(ebtel_file)
+model, model_dt = load_model_sav(model_file)
 
 dt_s=np.dtype([('Nx', np.int32),
                ('Ny', np.int32),
@@ -37,13 +209,13 @@ dt_s=np.dtype([('Nx', np.int32),
                ('dy', np.float64),
                ('freqlist', np.float64, len(freqlist))])
 simbox=np.zeros(1, dtype=dt_s)
-simbox['Nx']=Nx
-simbox['Ny']=Ny
+simbox['Nx']=box_Nx
+simbox['Ny']=box_Ny
 simbox['Nf']=len(freqlist)
-simbox['xc']=xc
-simbox['yc']=yc
-simbox['dx']=dx
-simbox['dy']=dy
+simbox['xc']=box_xc
+simbox['yc']=box_yc
+simbox['dx']=box_dx
+simbox['dy']=box_dy
 simbox['freqlist']=freqlist
 
 dt_c=np.dtype([('Tbase', np.float64),
@@ -62,31 +234,30 @@ cparms['iso']=force_isothermal
 
 dt_o=np.dtype([('flagsAll', np.int32, 6),
                ('flagsCorona', np.int32, 6),
-               ('TI', np.float64, (Nx, Ny, len(freqlist))),
-               ('TV', np.float64, (Nx, Ny, len(freqlist)))])
+               ('TI', np.float64, (box_Nx, box_Ny, len(freqlist))),
+               ('TV', np.float64, (box_Nx, box_Ny, len(freqlist)))])
 outspace=np.zeros(1, dtype=dt_o)
 
-libname='.\RenderGRFF_64.dll'
 libc_mw=ctypes.CDLL(libname)
 mwfunc=libc_mw.pyComputeMW
 _dt_s=np.ctypeslib.ndpointer(dtype=dt_s)
 _dt_c=np.ctypeslib.ndpointer(dtype=dt_c)
 _dt_o=np.ctypeslib.ndpointer(dtype=dt_o)
-mwfunc.argtypes=[ctypes.c_void_p, ctypes.c_void_p, _dt_s, _dt_c, _dt_o]
+_dt_ebtel=np.ctypeslib.ndpointer(dtype=ebtel_dt)
+_dt_model=np.ctypeslib.ndpointer(dtype=model_dt)
+
+mwfunc.argtypes=[_dt_model, _dt_ebtel, _dt_s, _dt_c, _dt_o]
 mwfunc.restype=ctypes.c_int
 
 r=mwfunc(model, ebtel, simbox, cparms, outspace)
 
 o=outspace[0]
-TI=np.reshape(np.ravel(o['TI']), (Nx, Ny, len(freqlist)), order='F')
-TV=np.reshape(np.ravel(o['TV']), (Nx, Ny, len(freqlist)), order='F')
+TI=np.reshape(np.ravel(o['TI']), (box_Nx, box_Ny, len(freqlist)), order='F')
+TV=np.reshape(np.ravel(o['TV']), (box_Nx, box_Ny, len(freqlist)), order='F')
 
-#-----------------------------------------
 
-plt.figure(1)
-img=plt.imshow(np.transpose(TI[:, :, 0]), origin='lower')
-
-plt.figure(2)
-img=plt.imshow(np.transpose(TV[:, :, 0]), origin='lower')
+fig1, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
+ax1.imshow(np.transpose(TI[:, :, 0]), origin='lower')
+ax2.imshow(np.transpose(TV[:, :, 0]), origin='lower')
 
 plt.show()
