@@ -54,15 +54,26 @@ function LoadGXmodel, infile
  chromo_uniform_Bavg=fltarr(s[0], s[1], box.corona_base)
  chromo_uniform_L=fltarr(s[0], s[1], box.corona_base)
  
- Q=fltarr(s[0], s[1], sc[2])
- Q[box.idx]=box.bmed
- corona_Bavg=Q[*, *, box.corona_base : sc[2]-1]
- chromo_uniform_Bavg=Q[*, *, 0 : box.corona_base-1]
+ if tag_exist(box, 'BMED') then begin
+  QB=fltarr(s[0], s[1], sc[2])
+  QB[box.idx]=box.bmed
+  QL=fltarr(s[0], s[1], sc[2])
+  QL[box.idx]=box.length*RSun
+ endif else if tag_exist(box, 'AVFIELD') then begin
+  QB=box.avfield
+  QL=box.physlength*RSun
+  u=where((box.status and 4) ne 4, k)
+  if k gt 0 then begin
+   QB[u]=0
+   QL[u]=0
+  endif
+ endif 
  
- Q[*]=0
- Q[box.idx]=box.length*RSun
- corona_L=Q[*, *, box.corona_base : sc[2]-1]
- chromo_uniform_L=Q[*, *, 0 : box.corona_base-1]
+ corona_Bavg=QB[*, *, box.corona_base : sc[2]-1]
+ chromo_uniform_Bavg=QB[*, *, 0 : box.corona_base-1]
+ 
+ corona_L=QL[*, *, box.corona_base : sc[2]-1]
+ chromo_uniform_L=QL[*, *, 0 : box.corona_base-1]
  
  model={Nx: long(Nx), $
         Ny: long(Ny), $
