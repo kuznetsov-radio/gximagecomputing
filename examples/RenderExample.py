@@ -15,7 +15,7 @@ os.environ['OMP_NUM_THREADS']='8' # number of parallel threads
 ebtel_file = "C:\MCloud\CoronalMW\AR-SRH\Data\ebtel\ebtelDEM.sav"
 model_file = "C:\MCloud\CoronalMW\AR-SRH\Data\Models\model20220130_0415.sav"
 
-libname='..\CHpipeline\RenderGRFF_64.dll'
+libname='C:\MCloud\CoronalMW\AR-SRH\IDLcode\CHpipeline\RenderGRFF_64.dll'
 
 box_Nx=150
 box_Ny=150
@@ -140,19 +140,25 @@ def load_model_sav(file_name):
     chromo_nHI.flat[chromo_idx]= model_data.box.n_hi[0].flat
     chromo_T0.flat[chromo_idx] = model_data.box.chromo_t[0].flat
 
-    Q=np.zeros((Nx, Ny, sc[1]))
+    if "BMED" in model_data.box.dtype.names:
+        QB = np.zeros((Nx, Ny, sc[1]))
+        QL = np.zeros((Nx, Ny, sc[1]))
+        idx = np.unravel_index(model_data.box.idx[0], QB.shape, order="F")
 
-    idx    = np.unravel_index(model_data.box.idx[0], Q.shape, order="F")
-    length = model_data.box.length[0]
+        QB[idx] = model_data.box.bmed[0]
+        QL[idx] = model_data.box.length[0]*RSun
+    elif "AVFIELD" in model_data.box.dtype.names:
+        QB = model_data.box.avfield[0].T.copy()
+        QL = model_data.box.physlength[0].T.copy()*RSun
+        uu = model_data.box.status[0].T
+        QB[(uu & 4) != 4] = 0
+        QL[(uu & 4) != 4] = 0
 
-    Q[idx] = model_data.box.bmed[0]
-    corona_Bavg         = Q[:, :, corona_base : sc[1]].copy().T
-    chromo_uniform_Bavg = Q[:, :, 0 : corona_base].copy().T
+    corona_Bavg         = QB[:, :, corona_base : sc[1]].T
+    chromo_uniform_Bavg = QB[:, :, 0 : corona_base].T
 
-    Q[:, :, :]=0
-    Q[idx]=length*RSun
-    corona_L         = Q[:, :, corona_base : sc[1]].T
-    chromo_uniform_L = Q[:, :, 0 : corona_base].T
+    corona_L         = QL[:, :, corona_base : sc[1]].T
+    chromo_uniform_L = QL[:, :, 0 : corona_base].T
 
     model_dt_varlist = [
             ('Nx', np.int32),
