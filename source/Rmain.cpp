@@ -6,7 +6,6 @@
 #include "ExtMath.h"
 #include "RenderIrregular.h"
 #include "MWtransfer.h"
-#include "Messages.h"
 
 #ifndef LINUX
 #include <ppl.h>
