@@ -37,3 +37,24 @@ classifiers = [
 [project.urls]
 Issues = "https://github.com/kuznetsov-radio/gximagecomputing/issues"
 Repository = "https://github.com/kuznetsov-radio/gximagecomputing/"
+
+[tool.cibuildwheel]
+skip = ["cp36*", "cp37*", "cp38*", "cp39*", "pp*", "*musl*"]
+build-frontend = "build"
+
+[[tool.cibuildwheel.overrides]]
+select = "cp*"
+manylinux-x86_64-image = "manylinux_2_28"
+manylinux-i686-image = "manylinux2014"
+
+#[[tool.cibuildwheel.overrides]]
+#select = "cp312*"
+#manylinux-x86_64-image = "manylinux_2_34"
+
+[tool.cibuildwheel.linux]
+repair-wheel-command = "auditwheel repair -w {dest_dir} {wheel}"
+
+[tool.cibuildwheel.macos]
+repair-wheel-command = "delocate-wheel --require-archs {delocate_archs} -w {dest_dir} -v {wheel}"
+
+[tool.cibuildwheel.windows]
