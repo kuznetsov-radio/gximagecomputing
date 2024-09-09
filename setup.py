@@ -15,9 +15,9 @@ compile_flags = {
 }
 
 link_flags = {
-    'Linux': ["-shared", "-fopenmp"],
-    'Windows': ["-shared", "-fopenmp"],
-    'Darwin': ["-fopenmp"]
+    'Linux': ["-shared", "-fopenmp", "-lm"],
+    'Windows': ["-shared", "-fopenmp", "-lm"],
+    'Darwin': ["-fopenmp", "-lm"]
 }
 
 current_os = platform.system()
