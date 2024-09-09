@@ -1,0 +1,39 @@
+[build-system]
+requires = ["setuptools>=65.4.1", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "gximagecomputing"
+version = "0.0.1"
+readme = "README.md"
+
+dependencies = [
+    'importlib-metadata; python_version>="3.10"',
+    "numpy",
+    "astropy",
+    "sunpy",
+    "scipy",
+]
+
+description = "This code computes the 2D maps of the solar gyroresonance and free-free microwave emission using the models of active regions created by the GX Simulator."
+
+authors = [
+  {name = "Alexey Kuznetsov", email = "test@example.com"}
+]
+maintainers = [
+  {name = "Alexey Kuznetsov", email = "test@example.com"}
+]
+
+keywords = ["Sun", "radio emission", "gyroresonance", "microwave emission", "Sun active regions"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+]
+
+[project.urls]
+Issues = "https://github.com/kuznetsov-radio/gximagecomputing/issues"
+Repository = "https://github.com/kuznetsov-radio/gximagecomputing/"
