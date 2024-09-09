@@ -59,3 +59,6 @@ double LogFactorial(int n);
 double IntTabulated(double *x, double *y, int N);
 double InterpolBilinear(double *arr, double *x1arr, double *x2arr, double x1, double x2, int N1, int N2);
 double InterpolateBilinear(double *arr, double i1, double i2, int N1, int N2, double missing);
+
+#define _USE_MATH_DEFINES
+#include <cmath>
