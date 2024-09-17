@@ -15,7 +15,7 @@ class GXRadioImageComputing:
         if libname is not None:
             self.libname = libname
         else:
-            self.libname = list(Path(__file__).parent.glob("RenderGRFF*.so"))[0]
+            self.libname = list(Path(__file__).parent.glob("RenderGRFF*"))[0]
         libc_mw=ctypes.CDLL(self.libname)
         self.mwfunc=libc_mw.pyComputeMW
         self.mwfunc.restype=ctypes.c_int
