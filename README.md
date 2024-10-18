@@ -16,21 +16,22 @@ To compute the emission maps, you firstly need to create the input data blocks b
    If the chosen file contains only one EBTEL table (either DEM or DDM), the code loads that table; the /DEM and /DDM keywords are ignored.
 
 3. Define the size and position of the required radio maps, as well as the emission frequencies:<br/>
-   simbox=MakeSimulationBox(xc, yc, dx, dy, Nx, Ny, freqlist)<br/>
+   simbox=MakeSimulationBox(xc, yc, dx, dy, Nx, Ny, freqlist [, rot=rot])<br/>
    where:<br/>
-   xc and yc are the x and y coordinates of the map center (in the helioprojective coordinate system, in arcseconds);<br/>
-   dx and dy are the x and y resolutions of the map (in arcseconds);<br/>
-   Nx and Ny are the x and y sizes of the map (in pixels);<br/>
-   freqlist is the list (1D array) of the emission frequencies (in GHz) where the maps are to be computed.
+   xc and yc are the x and y coordinates of the map center (in the helioprojective coordinate system, in arcseconds).<br/>
+   dx and dy are the x and y resolutions of the map (in arcseconds).<br/>
+   Nx and Ny are the x and y sizes of the map (in pixels).<br/>
+   freqlist is the list (1D array) of the emission frequencies (in GHz) where the maps are to be computed.<br/>
+   rot is the optional rotation angle of the simulated radio maps (in degrees). If set, the simulation window is rotated counter-clockwise by this angle; in this case, the center of the resulting map is still at (xc, yc), and the x and y coordinates correspond to the rotated coordinate system. Default: 0.
    
-4. Define the parameters of the coronal plasma:<br/>
+5. Define the parameters of the coronal plasma:<br/>
    coronaparms=DefineCoronaParams(Tbase, nbase, Q0, a, b [, /force_isothermal])<br/>
    where:<br/>
    Tbase and nbase define the "default" plasma distribution; they are respectively the plasma temperature (in K) and the base plasma density at the bottom of the simulation box (in cm^{-3}). These parameters are used to find the plasma parameters in the voxels where the heating model is not applicable, i.e., either the voxel is associated with an open field line, or the heating parameters are beyond the boundaries of the EBTEL table. In such voxels, the plasma temperature is set to Tbase, and the plasma density is computed using nbase, Tbase, and the barometric formula.<br/>
    Q0, a, and b define the coronal heating model (which is applied to the closed field lines). The heating rate Q at each field line is computed as Q=Q0*(B/B0)^a/(L/L0)^b, where B is the average magnetic field along the line, L is the line half-length, and B0 and L0 are some pre-defined constants (the same as in GX Simulator).<br/>
    /force_isothermal - if set, the multi-thermal formulae given in the paper of Fleishman, Kuznetsov & Landi (2021) are not used, and the emission is computed using the moments of the DEM or DDM distribution (if both DEM and DDM are provided, the DDM moments are used). This option improves the computation speed greatly, although the results become less accurate.
    
-5. Prepare the memory structure for the simulation results:<br/>
+6. Prepare the memory structure for the simulation results:<br/>
    outspace=ReserveOutputSpace(simbox)<br/>
    where simbox is the structure returned by the MakeSimulationBox function.
    
