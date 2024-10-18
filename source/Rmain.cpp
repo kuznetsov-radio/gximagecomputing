@@ -194,6 +194,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  double b_yc=*(b64++);
  double b_dx=*(b64++);
  double b_dy=*(b64++);
+ double b_rot=*(b64++);
 
  double *b_freqlist=b64;
 
@@ -235,13 +236,18 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 
  //-------------------------------------
 
- double *wx=(double*)malloc(b_Nx*sizeof(double));
- wx[0]=b_xc-b_dx*(b_Nx-1)/2;
- for (int i=1; i<b_Nx; i++) wx[i]=wx[i-1]+b_dx;
+ double srot=sin(b_rot/180*M_PI);
+ double crot=cos(b_rot/180*M_PI);
+ double *wx=(double*)malloc(b_Nx*b_Ny*sizeof(double));
+ double *wy=(double*)malloc(b_Nx*b_Ny*sizeof(double));
 
- double *wy=(double*)malloc(b_Ny*sizeof(double));
- wy[0]=b_yc-b_dy*(b_Ny-1)/2;
- for (int j=1; j<b_Ny; j++) wy[j]=wy[j-1]+b_dy;
+ for (int i=0; i<b_Nx; i++) for (int j=0; j<b_Ny; j++)
+ {
+  double x1=-b_dx*(b_Nx-1)/2+i*b_dx;
+  double y1=-b_dy*(b_Ny-1)/2+j*b_dy;
+  wx[D2(b_Nx, i, j)]=b_xc+x1*crot-y1*srot;
+  wy[D2(b_Nx, i, j)]=b_yc+x1*srot+y1*crot;
+ }
 
  double *I_L=(double*)malloc(b_Nx*b_Ny*b_Nf*sizeof(double));
  double *I_R=(double*)malloc(b_Nx*b_Ny*b_Nf*sizeof(double));
@@ -278,7 +284,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
   for (int j=0; j<e_NL; j++) LgridL[j]=log((double)e_Lrun[D2(e_NQ, 0, j)]);
 
   QgridL=(double*)malloc(e_NQ*e_NL*sizeof(double));
-  for (int i=0; i<e_NQ*e_NL; i++) QgridL[i]=log((double)e_Qrun[i]); //### - possibly, transpose
+  for (int i=0; i<e_NQ*e_NL; i++) QgridL[i]=log((double)e_Qrun[i]);
 
   Tgrid=(double*)malloc(e_NT*sizeof(double));
   for (int i=0; i<e_NT; i++) Tgrid[i]=pow(10.0, (double)e_logtdem[i]);
@@ -323,8 +329,8 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 
  for (int i=i_start; i<=i_end; i++) for (int j=j_start; j<=j_end; j++)
  {
-  double spx=sin(M_PI/648000*wx[i]);
-  double spy=sin(M_PI/648000*wy[j]);
+  double spx=sin(M_PI/648000*wx[D2(b_Nx, i, j)]);
+  double spy=sin(M_PI/648000*wy[D2(b_Nx, i, j)]);
   double q=sqrt(1.0-sqr(spx)-sqr(spy));
   double xD=spx/q;
   double yD=spy/q;
