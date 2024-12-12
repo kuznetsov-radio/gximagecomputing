@@ -8,7 +8,7 @@ To compute the microwave emission maps, you firstly need to create the input dat
    model=LoadGXmodel(modelfile)<br/>
    where modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).
    
-2. Load the EBTEL table:<br/>
+2. Load the EBTEL tables:<br/>
    ebtel=LoadEBTEL(ebtelfile [, DEM=DEM, DDM=DDM])<br/>
    where ebtelfile is the name of the GX Simulator file containing the EBTEL table(s) that define the DEM and/or DDM.<br/> 
    If ebtelfile='' then the DEM, DDM, and coronal heating model are not used, and the coronal plasma is described by a model with a constant temperature and a barometric height profile of the plasma density (see below).<br/>
@@ -54,7 +54,7 @@ Computing the EUV emission maps is similar to that for the microwave emission, w
    model=LoadGXmodel(modelfile)<br/>
    where modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).
    
-2. Load the EBTEL table:<br/>
+2. Load the EBTEL tables:<br/>
    ebtel=LoadEBTEL(ebtelfile)<br/>
    where ebtelfile is the name of the GX Simulator file containing the EBTEL tables that define the DEM for the corona and transition region.<br/> 
    If ebtelfile='' then the DEM and coronal heating model are not used, and the coronal plasma is described by a model with a constant temperature and a barometric height profile of the plasma density.<br/>
