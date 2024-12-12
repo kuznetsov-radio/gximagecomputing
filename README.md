@@ -97,7 +97,7 @@ where libname is the name of the appropriate executable library, and model, ebte
 
 The output structure outspace contains the field flux, which represents the computed EUV flux (in DN s^{-1} pix^{-1}). It is a 3D array with Nx * Ny * Nchannels elements, where Nx and Ny are the x and y sizes of the computed maps, and Nchannels is the number of the EUV channels (defined by the selected instrumental response table). These data can be processed directly, or can be converted into the SolarSoft map object via the procedure<br/>
 ConvertToMapsEUV, outspace, simbox, model, response, mapEUV<br/>
-where the input parameters outspace, simbox, model, and response are the structures returned by the above-mentioned functions, and the output parameter mapEUV is the resulting SolarSoft (multi-frequency) map object which represents the computed emission.
+where the input parameters outspace, simbox, model, and response are the structures returned by the above-mentioned functions, and the output parameter mapEUV is the resulting SolarSoft (multi-channel) map object which represents the computed emission.
 
 An example of using the code is given in the file /examples/RenderExampleEUV.pro (the sample GX Simulator model and EBTEL data are not included).
 
