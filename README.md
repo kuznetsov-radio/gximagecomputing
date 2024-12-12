@@ -6,7 +6,8 @@ To compute the microwave emission maps, you firstly need to create the input dat
 
 1. Load the GX Simulator model:<br/>
    model=LoadGXmodel(modelfile)<br/>
-   where modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).
+   where modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).<br/>
+   Note: the parameter tr_mask (see below) has no effect for the microwave emission.
    
 2. Load the EBTEL tables:<br/>
    ebtel=LoadEBTEL(ebtelfile [, DEM=DEM, DDM=DDM])<br/>
@@ -51,8 +52,9 @@ An example of using the code is given in the file /examples/RenderExampleMW.pro 
 Computing the EUV emission maps is similar to that for the microwave emission, with a few differences. Firstly, you need to create the input data blocks by calling the following functions:
 
 1. Load the GX Simulator model:<br/>
-   model=LoadGXmodel(modelfile)<br/>
-   where modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).
+   model=LoadGXmodel(modelfile [,tr_mask=tr_mask])<br/>
+   where modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).<br/>
+   The optional parameter tr_mask is a 2D array specifying the 'transition region mask', i.e., defining the regions where the emission from the transition region makes a contribution to the resulting EUV flux (if the /AddTR keyword is set in the DefineCoronaParams function); see GX Simulator (panel 'Transition Region Attributes') for details. By default, the entire transition region is considered.
    
 2. Load the EBTEL tables:<br/>
    ebtel=LoadEBTEL(ebtelfile)<br/>
@@ -98,3 +100,5 @@ ConvertToMapsEUV, outspace, simbox, model, response, mapEUV<br/>
 where the input parameters outspace, simbox, model, and response are the structures returned by the above-mentioned functions, and the output parameter mapEUV is the resulting SolarSoft (multi-frequency) map object which represents the computed emission.
 
 An example of using the code is given in the file /examples/RenderExampleEUV.pro (the sample GX Simulator model and EBTEL data are not included).
+
+Optionally, both for the microwave and EUV emissions, selective heating of the coronal magnetic field lines can be defined via the SHtable parameter. This parameter is a 2D array (double precision floating point) with 7 * 7 elements. Each element of that table represents the factor applied to the heating rate Q for the field lines connecting specific regions at the photosphere; see the 'Selective Heating Mask' panel in GX Simulator. The SHtable table is supposed to be symmetric, i.e., SHtable[j, i]=SHtable[i, j]; asymmetric tables are accepted but the result will likely have no sense. By default (if the parameter SHtable is not supplied in calls to ComputeMW or ComputeEUV), all elements of that table are assumed to equal 1.
