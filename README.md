@@ -1,6 +1,6 @@
-This code computes the 2D maps of the solar gyroresonance and free-free microwave emission using the models of active regions created by the GX Simulator. The code is called from IDL (requires the SolarSoft package).
+This code computes the 2D maps of the solar microwave (gyroresonance and free-free) and EUV (spectral lines) emission using the models of active regions created by the GX Simulator. The code is called from IDL (requires the SolarSoft package).
 
-Quick start: see the file /examples/RenderExample.pro (the sample GX Simulator model and EBTEL data are not included).
+Quick start: see the files /examples/RenderExampleMW.pro and /examples/RenderExampleEUV.pro (the sample GX Simulator model and EBTEL data are not included).
 
 To compute the emission maps, you firstly need to create the input data blocks by calling the following functions:
 
