@@ -1,4 +1,4 @@
-function LoadGXmodel, infile
+function LoadGXmodel, infile, tr_mask=tr_mask
  restore, infile
  
  obstime=anytim(box.index.date_obs)
@@ -49,23 +49,26 @@ function LoadGXmodel, infile
  chromo_nHI[box.chromo_idx]=box.n_hi
  chromo_T0[box.chromo_idx]=box.chromo_T
  
- corona_Bavg=fltarr(s[0], s[1], corona_layers)
- corona_L=fltarr(s[0], s[1], corona_layers)
- chromo_uniform_Bavg=fltarr(s[0], s[1], box.corona_base)
- chromo_uniform_L=fltarr(s[0], s[1], box.corona_base)
- 
- if tag_exist(box, 'BMED') then begin
+ if tag_exist(box, 'BMED') then begin ;old version
   QB=fltarr(s[0], s[1], sc[2])
   QB[box.idx]=box.bmed
   QL=fltarr(s[0], s[1], sc[2])
   QL[box.idx]=box.length*RSun
- endif else if tag_exist(box, 'AVFIELD') then begin
+  ID1=bytarr(s[0], s[1], s[2])
+  ID1[box.idx]=box.base.chromo_mask[box.foot1]
+  ID2=bytarr(s[0], s[1], s[2])
+  ID2[box.idx]=box.base.chromo_mask[box.foot2]  
+ endif else if tag_exist(box, 'AVFIELD') then begin ;new version
   QB=box.avfield
   QL=box.physlength*RSun
+  ID1=byte(box.base.chromo_mask[box.startidx])
+  ID2=byte(box.base.chromo_mask[box.endidx])
   u=where((box.status and 4) ne 4, k)
   if k gt 0 then begin
    QB[u]=0
    QL[u]=0
+   ID1[u]=0
+   ID2[u]=0
   endif
  endif 
  
@@ -74,6 +77,13 @@ function LoadGXmodel, infile
  
  corona_L=QL[*, *, box.corona_base : sc[2]-1]
  chromo_uniform_L=QL[*, *, 0 : box.corona_base-1]
+ 
+ VoxelID=gx_box2id(box, tr_mask=tr_mask)
+ 
+ corona_ID1=ID1[*, *, box.corona_base : sc[2]-1]
+ corona_ID2=ID2[*, *, box.corona_base : sc[2]-1]
+ chromo_uniform_ID1=ID1[*, *, 0 : box.corona_base-1]
+ chromo_uniform_ID2=ID2[*, *, 0 : box.corona_base-1]
  
  model={Nx: long(Nx), $
         Ny: long(Ny), $
@@ -100,7 +110,12 @@ function LoadGXmodel, infile
         corona_Bavg: float(corona_Bavg), $
         corona_L: float(corona_L), $
         chromo_uniform_Bavg: float(chromo_uniform_Bavg), $
-        chromo_uniform_L: float(chromo_uniform_L)}
+        chromo_uniform_L: float(chromo_uniform_L), $
+        VoxelID: byte(VoxelID), $
+        corona_ID1: byte(corona_ID1), $
+        corona_ID2: byte(corona_ID2), $
+        chromo_uniform_ID1: byte(chromo_uniform_ID1), $
+        chromo_uniform_ID2: byte(chromo_uniform_ID2)}
         
  return, model
 end

@@ -36,7 +36,10 @@ function LoadEBTEL, infile, DEM=DEM, DDM=DDM
    ebtel.DDM_on=1
    ebtel=create_struct(ebtel, $
                        'DDM_cor_run', float(DDM_cor_run)) 
-  endif               
+  endif          
+  
+  if exist(DEM_tr_run) && ebtel.DEM_on then ebtel=create_struct(ebtel, 'DEM_tr_run', float(DEM_tr_run)) 
+  if exist(DDM_tr_run) && ebtel.DDM_on then ebtel=create_struct(ebtel, 'DDM_tr_run', float(DDM_tr_run)) 
  endif       
         
  return, ebtel
