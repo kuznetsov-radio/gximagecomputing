@@ -73,7 +73,7 @@ Computing the EUV emission maps is similar to that for the microwave emission, w
    xc and yc are the x and y coordinates of the map center (in the helioprojective coordinate system, in arcseconds).<br/>
    dx and dy are the x and y resolutions of the map (in arcseconds).<br/>
    Nx and Ny are the x and y sizes of the map (in pixels).<br/>
-   Note that the particular EUV channels cannot be chosen: the code computes the emission for all channels specified by the instrumental response table. Also, the code computes the emission as if observed from the Earth; thus for Solar Orbiter and STEREO the map position and pixel size should be corrected accordingly.<br/>
+   Note that the particular EUV channels cannot be selected: the code computes the emission for all channels specified by the instrumental response table. Also, the code computes the emission as if observed from the Earth; thus for Solar Orbiter and STEREO the map position and pixel size should be corrected accordingly.<br/>
    
 6. Define the parameters of the coronal plasma:<br/>
    coronaparms=DefineCoronaParams(Tbase, nbase, Q0, a, b [, /AddTR])<br/>
@@ -93,7 +93,7 @@ When the input data are ready, the computation is performed by calling the main 
 r=call_external(libname, 'ComputeEUV', model, ebtel, response, simbox, coronaparms, outspace [, SHtable])<br/>
 where libname is the name of the appropriate executable library, and model, ebtel, response, simbox, coronaparms, and outspace are the structures returned by the above-mentioned functions.
 
-The output structure outspace contains the field flux, which represents the computed EUV flux (in DN s^{-1} pix^{-1}). It is a 3D array with Nx * Ny * Nchannels elements, where Nx and Ny are the x and y sizes of the computed maps, and Nchannels is the number of the EUV channels. These data can be processed directly, or can be converted into the SolarSoft map object via the procedure<br/>
+The output structure outspace contains the field flux, which represents the computed EUV flux (in DN s^{-1} pix^{-1}). It is a 3D array with Nx * Ny * Nchannels elements, where Nx and Ny are the x and y sizes of the computed maps, and Nchannels is the number of the EUV channels (defined by the selected instrumental response table). These data can be processed directly, or can be converted into the SolarSoft map object via the procedure<br/>
 ConvertToMapsEUV, outspace, simbox, model, response, mapEUV<br/>
 where the input parameters outspace, simbox, model, and response are the structures returned by the above-mentioned functions, and the output parameter mapEUV is the resulting SolarSoft (multi-frequency) map object which represents the computed emission.
 
