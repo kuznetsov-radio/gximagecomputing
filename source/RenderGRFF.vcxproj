@@ -159,9 +159,11 @@
     <ClCompile Include="Coulomb.cpp" />
     <ClCompile Include="DEM.cpp" />
     <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="EUVmain.cpp" />
     <ClCompile Include="ExtMath.cpp" />
     <ClCompile Include="FF.cpp" />
     <ClCompile Include="GR.cpp" />
+    <ClCompile Include="GXexports.cpp" />
     <ClCompile Include="Messages.cpp" />
     <ClCompile Include="MWtransfer.cpp" />
     <ClCompile Include="Neutrals.cpp" />
@@ -176,6 +178,7 @@
     <ClInclude Include="ExtMath.h" />
     <ClInclude Include="FF.h" />
     <ClInclude Include="GR.h" />
+    <ClInclude Include="GXdefs.h" />
     <ClInclude Include="IDLinterface.h" />
     <ClInclude Include="Messages.h" />
     <ClInclude Include="MWtransfer.h" />

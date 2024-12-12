@@ -53,12 +53,23 @@ inline void arrswap(int *a, int i, int j)
 }
 
 void CrossP(double *a, double *b, double *axb);
+void rotC(double *r, double lat, double lon);
 int value_locate(double *a, int n, double x);
 
 double LogFactorial(int n);
 double IntTabulated(double *x, double *y, int N);
 double InterpolBilinear(double *arr, double *x1arr, double *x2arr, double x1, double x2, int N1, int N2);
 double InterpolateBilinear(double *arr, double i1, double i2, int N1, int N2, double missing);
+void InterpolateTrilinear(int Nx, int Ny, int Nz, double Dx, double Dy, double *zc_arr, 
+                          float *Bx_arr, float *By_arr, float *Bz_arr, double x, double y, double z,
+	                      double *Bx, double *By, double *Bz);
 
-#define _USE_MATH_DEFINES
-#include <cmath>
+class Spline
+{
+ int N;
+ double *x_arr, *y_arr, *y2_arr;
+ public:
+ Spline(int _N, double *x, double *y);
+ ~Spline();
+ void Interpolate(double x, double *y, double *y1);
+};

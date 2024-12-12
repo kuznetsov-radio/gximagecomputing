@@ -6,111 +6,18 @@
 #include "ExtMath.h"
 #include "RenderIrregular.h"
 #include "MWtransfer.h"
+#include "GXdefs.h"
 
 #ifndef LINUX
 #include <ppl.h>
+#include <concrtrm.h>
 #else
 #include <omp.h>
 #define __int32 int32_t
 #endif
 
-void rotC(double *r, double lat, double lon)
-{
- double slat=sin(M_PI/180*lat);
- double clat=cos(M_PI/180*lat);
- double slon=sin(M_PI/180*lon);
- double clon=cos(M_PI/180*lon);
-
- double r1[3];
- r1[0]=r[0]*clon-r[2]*slon;
- r1[1]=r[1]; 
- r1[2]=r[0]*slon+r[2]*clon;
-
- r[0]=r1[0]; 
- r[1]=-r1[2]*slat+r1[1]*clat;
- r[2]=r1[2]*clat+r1[1]*slat;
-}
-
-void InterpolateTrilinear(int Nx, int Ny, int Nz, double Dx, double Dy, double *zc_arr, 
-                          float *Bx_arr, float *By_arr, float *Bz_arr, double x, double y, double z,
-	                      double *Bx, double *By, double *Bz)
-{
- double x_ind=x/Dx-0.5;
- double y_ind=y/Dy-0.5;
-
- int i1=min(max(int(x_ind), 0), Nx-2);
- int i2=i1+1;
- int j1=min(max(int(y_ind), 0), Ny-2);
- int j2=j1+1;
-
- double dx=x_ind-i1;
- double dy=y_ind-j1;
-
- double *zc_local=(double*)malloc(sizeof(double)*Nz);
-
- for (int k=0; k<Nz; k++) zc_local[k]=zc_arr[D3(Nx, Ny, i1, j1, k)];
- int k111=min(max(value_locate(zc_local, Nz, z), 0), Nz-2);
- int k112=k111+1;
- double dz11=(z-zc_local[k111])/(zc_local[k112]-zc_local[k111]);
-
- for (int k=0; k<Nz; k++) zc_local[k]=zc_arr[D3(Nx, Ny, i1, j2, k)];
- int k121=min(max(value_locate(zc_local, Nz, z), 0), Nz-2);
- int k122=k121+1;
- double dz12=(z-zc_local[k121])/(zc_local[k122]-zc_local[k121]);
-
- for (int k=0; k<Nz; k++) zc_local[k]=zc_arr[D3(Nx, Ny, i2, j1, k)];
- int k211=min(max(value_locate(zc_local, Nz, z), 0), Nz-2);
- int k212=k211+1;
- double dz21=(z-zc_local[k211])/(zc_local[k212]-zc_local[k211]);
-
- for (int k=0; k<Nz; k++) zc_local[k]=zc_arr[D3(Nx, Ny, i2, j2, k)];
- int k221=min(max(value_locate(zc_local, Nz, z), 0), Nz-2);
- int k222=k221+1;
- double dz22=(z-zc_local[k221])/(zc_local[k222]-zc_local[k221]);
-
- free(zc_local);
-
- double u111=(1.0-dx)*(1.0-dy)*(1.0-dz11);
- double u211=dx*(1.0-dy)*(1.0-dz21);
- double u121=(1.0-dx)*dy*(1.0-dz12);
- double u112=(1.0-dx)*(1.0-dy)*dz11;
- double u212=dx*(1.0-dy)*dz21;
- double u122=(1.0-dx)*dy*dz12;
- double u221=dx*dy*(1.0-dz22);
- double u222=dx*dy*dz22;
-
- *Bx=Bx_arr[D3(Nx, Ny, i1, j1, k111)]*u111+
-     Bx_arr[D3(Nx, Ny, i2, j1, k211)]*u211+
-     Bx_arr[D3(Nx, Ny, i1, j2, k121)]*u121+
-     Bx_arr[D3(Nx, Ny, i1, j1, k112)]*u112+
-     Bx_arr[D3(Nx, Ny, i2, j1, k212)]*u212+
-     Bx_arr[D3(Nx, Ny, i1, j2, k122)]*u122+
-     Bx_arr[D3(Nx, Ny, i2, j2, k221)]*u221+
-     Bx_arr[D3(Nx, Ny, i2, j2, k222)]*u222;
-
- *By=By_arr[D3(Nx, Ny, i1, j1, k111)]*u111+
-     By_arr[D3(Nx, Ny, i2, j1, k211)]*u211+
-     By_arr[D3(Nx, Ny, i1, j2, k121)]*u121+
-     By_arr[D3(Nx, Ny, i1, j1, k112)]*u112+
-     By_arr[D3(Nx, Ny, i2, j1, k212)]*u212+
-     By_arr[D3(Nx, Ny, i1, j2, k122)]*u122+
-     By_arr[D3(Nx, Ny, i2, j2, k221)]*u221+
-     By_arr[D3(Nx, Ny, i2, j2, k222)]*u222;
-
- *Bz=Bz_arr[D3(Nx, Ny, i1, j1, k111)]*u111+
-     Bz_arr[D3(Nx, Ny, i2, j1, k211)]*u211+
-     Bz_arr[D3(Nx, Ny, i1, j2, k121)]*u121+
-     Bz_arr[D3(Nx, Ny, i1, j1, k112)]*u112+
-     Bz_arr[D3(Nx, Ny, i2, j1, k212)]*u212+
-     Bz_arr[D3(Nx, Ny, i1, j2, k122)]*u122+
-     Bz_arr[D3(Nx, Ny, i2, j2, k221)]*u221+
-     Bz_arr[D3(Nx, Ny, i2, j2, k222)]*u222;
-}
-
 #define InSize 15
 #define OutSize 7
-#define Bavg0 100
-#define Lline0 1e9
 
 #ifndef LINUX
 extern "C" __declspec(dllexport) int ComputeMW_fragment(int argc, void **argv)
@@ -148,6 +55,13 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  float *m_corona_L=m_corona_Bavg+m_Nx*m_Ny*m_corona_layers;
  float *m_chromo_uniform_Bavg=m_corona_L+m_Nx*m_Ny*m_corona_layers;
  float *m_chromo_uniform_L=m_chromo_uniform_Bavg+m_Nx*m_Ny*m_corona_base;
+
+ char *m_VoxelID=(char*)(m_chromo_uniform_L+m_Nx*m_Ny*m_corona_base);
+
+ char *m_corona_ID1=m_VoxelID+m_Nx*m_Ny*m_Nz;
+ char *m_corona_ID2=m_corona_ID1+m_Nx*m_Ny*m_corona_layers;
+ char *m_chromo_uniform_ID1=m_corona_ID2+m_Nx*m_Ny*m_corona_layers;
+ char *m_chromo_uniform_ID2=m_chromo_uniform_ID1+m_Nx*m_Ny*m_corona_base;
 
  //-------------------------------------
 
@@ -222,16 +136,20 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 
  //-------------------------------------
 
- int *fragment=(int*)argv[5];
+ double *SHtable=(double*)argv[5];
+
+ //-------------------------------------
+
+ int *fragment=(int*)argv[6];
  int i_start=fragment[0];
  int i_end=fragment[1];
  int j_start=fragment[2];
  int j_end=fragment[3];
 
- char *flagsGlobal=(char*)argv[6];
+ char *flagsGlobal=(char*)argv[7];
 
  #ifndef LINUX
- concurrency::critical_section *cs=(concurrency::critical_section*)argv[7];
+ concurrency::critical_section *cs=(concurrency::critical_section*)argv[8];
  #endif
 
  //-------------------------------------
@@ -410,6 +328,9 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 	double Bavg, Lline;
 	Bavg=Lline=0;
 
+    int ID1, ID2;
+    ID1=ID2=0;
+
 	int idx_i=VoxList[k] % m_Nx;
 	int idx_j=(VoxList[k]/m_Nx) % m_Ny;
 	int idx_k=(VoxList[k]/m_Nx)/m_Ny;
@@ -430,12 +351,16 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 	  int l=int(h[VoxList[k]]/m_dz_uniform);
 	  Bavg=m_chromo_uniform_Bavg[D3(m_Nx, m_Ny, idx_i, idx_j, l)];
 	  Lline=m_chromo_uniform_L[D3(m_Nx, m_Ny, idx_i, idx_j, l)];
+	  ID1=m_chromo_uniform_ID1[D3(m_Nx, m_Ny, idx_i, idx_j, l)];
+	  ID2=m_chromo_uniform_ID2[D3(m_Nx, m_Ny, idx_i, idx_j, l)];
 	 }
 	}
 	else
 	{
 	 Bavg=m_corona_Bavg[D3(m_Nx, m_Ny, idx_i, idx_j, idx_k-m_chromo_layers)];
 	 Lline=m_corona_L[D3(m_Nx, m_Ny, idx_i, idx_j, idx_k-m_chromo_layers)];
+	 ID1=m_corona_ID1[D3(m_Nx, m_Ny, idx_i, idx_j, idx_k-m_chromo_layers)];
+	 ID2=m_corona_ID2[D3(m_Nx, m_Ny, idx_i, idx_j, idx_k-m_chromo_layers)];
 	}
 
 	if (Bavg>0 && (DEM_on || DDM_on))
@@ -445,6 +370,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 	 Lline/=2; //switch from line length to line half-length, for consistency with GX Simulator
 
 	 double Q=cp_Q0*pow(Bavg/Bavg0, cp_a)/pow(Lline/Lline0, cp_b);
+	 if (SHtable) Q*=SHtable[D2(SHsize, ID1-1, ID2-1)];
 	 
 	 double Qlog=log(Q);
 	 double Llog=log(Lline);
@@ -594,43 +520,54 @@ extern "C" int ComputeMW(int argc, void **argv)
  char *flags=(char*)malloc(m_Nx*m_Ny*m_Nz*sizeof(char));
  memset(flags, 0, m_Nx*m_Ny*m_Nz*sizeof(char));
 
+ void *SHtable=(argc>5) ? argv[5] : 0;
+
  #ifndef LINUX
  concurrency::critical_section cs;
+
+ int NtMax=concurrency::GetProcessorCount();
+ int K=int(b_Ny/NtMax);
+ int Np=b_Ny % NtMax;
+ int Nm=NtMax-Np;
  
- concurrency::parallel_for(0, b_Ny, [&](int j)
+ concurrency::parallel_for(0, NtMax, [&](int j)
  {
-  void *ARGV[8];
+  void *ARGV[9];
   memcpy(ARGV, argv, sizeof(void*)*5);
+  ARGV[5]=SHtable;
 
   int fragment[4];
-  ARGV[5]=(void*)fragment;
+  ARGV[6]=(void*)fragment;
 
-  ARGV[6]=(void*)flags;
-  ARGV[7]=(void*)&cs;
+  ARGV[7]=(void*)flags;
+  ARGV[8]=(void*)&cs;
 
   fragment[0]=0;
   fragment[1]=b_Nx-1;
-  fragment[2]=fragment[3]=j;
 
-  ComputeMW_fragment(8, ARGV);
+  fragment[2]=(j<Nm) ? K*j : K*Nm+(K+1)*(j-Nm);
+  fragment[3]=fragment[2]+((j<Nm) ? K : K+1)-1;
+
+  ComputeMW_fragment(9, ARGV);
  });
  #else
  #pragma omp parallel for
  for (int j=0; j<b_Ny; j++)
  {
-  void *ARGV[8];
+  void *ARGV[9];
   memcpy(ARGV, argv, sizeof(void*)*5);
+  ARGV[5]=SHtable;
 
   int fragment[4];
-  ARGV[5]=(void*)fragment;
+  ARGV[6]=(void*)fragment;
 
-  ARGV[6]=(void*)flags;
+  ARGV[7]=(void*)flags;
 
   fragment[0]=0;
   fragment[1]=b_Nx-1;
   fragment[2]=fragment[3]=j;
 
-  ComputeMW_fragment(8, ARGV);
+  ComputeMW_fragment(9, ARGV);
  }
  #endif
 
@@ -663,91 +600,4 @@ extern "C" int pyComputeMW(void* model, void* ebtel, void* simbox, void* cparms,
  ARGV[4]=out;
 
  return ComputeMW(5, ARGV);
-}
-
-#ifndef LINUX
-extern "C" __declspec(dllexport) int InterpolateEBTEL(int argc, void **argv)
-#else
-extern "C" int InterpolateEBTEL(int argc, void **argv)
-#endif
-{
- int *Lparms=(int*)argv[0];
- int Npoints=Lparms[0];
- int NQ=Lparms[1];
- int NL=Lparms[2];
- int NT=Lparms[3];
- int DEM_on=Lparms[4];
- int DDM_on=Lparms[5];
-
- float *Qrun=(float*)argv[1];
- float *Lrun=(float*)argv[2];
- float *DEM_run=(float*)argv[3];
- float *DDM_run=(float*)argv[4];
-
- double *Qarr=(double*)argv[5];
- double *Larr=(double*)argv[6];
-
- double *DEM_arr=(double*)argv[7];
- double *DDM_arr=(double*)argv[8];
- char *flag=(char*)argv[9];
-
- double *LgridL=(double*)malloc(NL*sizeof(double));
- for (int j=0; j<NL; j++) LgridL[j]=log((double)Lrun[D2(NQ, 0, j)]);
-
- double *QgridL=(double*)malloc(NQ*NL*sizeof(double));
- for (int i=0; i<NQ*NL; i++) QgridL[i]=log((double)Qrun[i]);
-
- #ifndef LINUX
- concurrency::parallel_for(0, Npoints, [&](int k)
- {
- #else
- #pragma omp parallel for
- for (int k=0; k<Npoints; k++)
- {
- #endif
-  flag[k]=0;
-
-  double Qlog=log(Qarr[k]);
-  double Llog=log(Larr[k]);
-
-  int Lind=value_locate(LgridL, NL, Llog);
-
-  if (Lind>=0 && Lind<(NL-1))
-  {
-   int Qind1=value_locate(QgridL+Lind*NQ, NQ, Qlog);
-   int Qind2=value_locate(QgridL+(Lind+1)*NQ, NQ, Qlog);
-
-   if (Qind1>=0 && Qind1<(NQ-1) && Qind2>=0 && Qind2<(NQ-1))
-   {
-	flag[k]=1;
-
-	double dL=(Llog-LgridL[Lind])/(LgridL[Lind+1]-LgridL[Lind]);
-    double dQ1=(Qlog-QgridL[D2(NQ, Qind1, Lind)])/(QgridL[D2(NQ, Qind1+1, Lind)]-QgridL[D2(NQ, Qind1, Lind)]);
-    double dQ2=(Qlog-QgridL[D2(NQ, Qind2, Lind+1)])/(QgridL[D2(NQ, Qind2+1, Lind+1)]-QgridL[D2(NQ, Qind2, Lind+1)]);
-
-	if (DEM_on)
-	 for (int l=0; l<NT; l++)
-	  DEM_arr[D2(NT, l, k)]=DEM_run[D3(NT, NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
-                            DEM_run[D3(NT, NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
-                            DEM_run[D3(NT, NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
-                            DEM_run[D3(NT, NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
-
-	if (DDM_on)
- 	 for (int l=0; l<NT; l++)
-	  DDM_arr[D2(NT, l, k)]=DDM_run[D3(NT, NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
-                            DDM_run[D3(NT, NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
-                            DDM_run[D3(NT, NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
-                            DDM_run[D3(NT, NQ, l, Qind2+1, Lind+1)]*dL*dQ2; 
-   }
-  }
- #ifndef LINUX
- });
- #else
- }
- #endif
-
- free(LgridL);
- free(QgridL);
-
- return 0;
 }
