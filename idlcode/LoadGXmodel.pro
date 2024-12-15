@@ -1,4 +1,4 @@
-function LoadGXmodel, infile, tr_mask=tr_mask
+function LoadGXmodel, infile, tr_mask=tr_mask, noVoxelID=noVoxelID
  restore, infile
  
  obstime=anytim(box.index.date_obs)
@@ -78,7 +78,8 @@ function LoadGXmodel, infile, tr_mask=tr_mask
  corona_L=QL[*, *, box.corona_base : sc[2]-1]
  chromo_uniform_L=QL[*, *, 0 : box.corona_base-1]
  
- VoxelID=gx_box2id(box, tr_mask=tr_mask)
+ if ~keyword_set(NoVoxelID) then VoxelID=gx_box2id(box, tr_mask=tr_mask) $
+ else VoxelID=bytarr(s)
  
  corona_ID1=ID1[*, *, box.corona_base : sc[2]-1]
  corona_ID2=ID2[*, *, box.corona_base : sc[2]-1]

@@ -13,11 +13,11 @@ pro ConvertToMaps, out, box, model, mapI, mapV, flux=flux
   r=flux_on ? sfu*c^2/(2.0*kB*(box.freqlist[k]*1d9)^2)/(box.dx*box.dy*(!dpi/180/60/60)^2) : 1d0
   m=make_map(out.TI[*, *, k]/r, xc=box.xc, yc=box.yc, dx=box.dx, dy=box.dy, $
              id=id+'I '+string(box.freqlist[k], format='(F5.2)')+' GHz', time=anytim(model.obstime, /vms), $
-             freq=box.freqlist[k])
+             freq=box.freqlist[k], units=flux_on ? 'sfu pix^-1' : 'K')
   mapI->setmap, k, m
   m=make_map(out.TV[*, *, k]/r, xc=box.xc, yc=box.yc, dx=box.dx, dy=box.dy, $
              id=id+'V '+string(box.freqlist[k], format='(F5.2)')+' GHz', time=anytim(model.obstime, /vms), $
-             freq=box.freqlist[k])
+             freq=box.freqlist[k], units=flux_on ? 'sfu pix^-1' : 'K')
   mapV->setmap, k, m
  endfor
 end

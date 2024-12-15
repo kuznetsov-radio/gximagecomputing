@@ -27,11 +27,11 @@ function LoadEUVresponse, model, instrument=instrument, evenorm=evenorm, chianti
         end
   'solo-fsi': begin
                r=gx_get_eui_response(anytim(model.obstime, /vms), /fsi)
-               ds=20.25d0
+               ds=4.4401245d0^2
               end
   'solo-hri': begin
                r=gx_get_eui_response(anytim(model.obstime, /vms), /hri)
-               ds=0.25d0
+               ds=0.49200001d0^2
               end   
   'stereo-a': begin
                r=gx_get_euvi_response(anytim(model.obstime, /vms), /a)
