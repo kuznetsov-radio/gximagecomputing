@@ -45,7 +45,8 @@ where libname is the name of the appropriate executable library, and model, ebte
 
 The output structure outspace contains the fields outspace.TI and outspace.TV, which represent the brightness temperatures corresponding respectively to the Stokes parameters I and V of the computed emission (in K). Each field is a 3D array with Nx * Ny * Nf elements, where Nx and Ny are the x and y sizes of the computed maps, and Nf is the number of the emission frequencies. These data can be processed directly, or can be converted into the SolarSoft map objects via the procedure<br/>
 ConvertToMaps, outspace, simbox, model, mapI, mapV [, /flux]<br/>
-where the input parameters outspace, simbox, and model are the structures returned by the above-mentioned functions, and the output parameters mapI and mapV are the resulting SolarSoft (multi-frequency) map objects which represent the brightness temperatures corresponding respectively to the Stokes parameters I and V of the computed emission (in K or sfu/pix, if the keyword /flux is not set or set, respectively).
+where the input parameters outspace, simbox, and model are the structures returned by the above-mentioned functions, and the output parameters mapI and mapV are the resulting SolarSoft (multi-frequency) map objects which represent the brightness temperatures corresponding respectively to the Stokes parameters I and V of the computed emission (in K or sfu/pix, if the keyword /flux is not set or set, respectively).<br/>
+In addition, the output structure outspace contains the fields outspace.flagsAll and outspace.flagsCorona that are described below.
 
 An example of using the code is given in the file /examples/RenderExampleMW.pro (the sample GX Simulator model and EBTEL data are not included).
 
@@ -66,7 +67,7 @@ Computing the EUV emission maps is similar to that for the microwave emission, w
    response=LoadEUVresponse(model [, instrument, evenorm=evenorm, chiantifix=chiantifix])<br/>
    where:<br/>
    model is the structure returned by the LoadGXmodel function.<br/>
-   instrument is the name of the chosen instrument. Currently, the following instruments are supported: 'AIA', 'AIA2', 'TRACE', 'SXT', 'SOLO-FSI', 'SOLO-HRI', 'STEREO-A', 'STEREO-B'. Default: 'AIA'. Note that the code computes the emission as if observed from the Earth; thus for Solar Orbiter and STEREO some additional adjustments of the EUV flux will be needed.<br/>
+   instrument is the name of the chosen instrument. Currently, the following instruments are supported: 'AIA', 'AIA2', 'TRACE', 'SXT', 'SOLO-FSI', 'SOLO-HRI', 'STEREO-A', 'STEREO-B'. Default: 'AIA'.<br/>
    evenorm and chiantifix: these parameters are applicable to the AIA instrument only (see the SolarSoft function aia_get_response.pro). Default: evenorm=1, chiantifix=1.
 
 5. Define the size and position of the required EUV maps:<br/>
@@ -97,7 +98,8 @@ where libname is the name of the appropriate executable library, and model, ebte
 
 The output structure outspace contains the field flux, which represents the computed EUV flux (in DN s^{-1} pix^{-1}). It is a 3D array with Nx * Ny * Nchannels elements, where Nx and Ny are the x and y sizes of the computed maps, and Nchannels is the number of the EUV channels (defined by the selected instrumental response table). These data can be processed directly, or can be converted into the SolarSoft map object via the procedure<br/>
 ConvertToMapsEUV, outspace, simbox, model, response, mapEUV<br/>
-where the input parameters outspace, simbox, model, and response are the structures returned by the above-mentioned functions, and the output parameter mapEUV is the resulting SolarSoft (multi-channel) map object which represents the computed emission.
+where the input parameters outspace, simbox, model, and response are the structures returned by the above-mentioned functions, and the output parameter mapEUV is the resulting SolarSoft (multi-channel) map object which represents the computed emission.<br/>
+In addition, the output structure outspace contains the fields outspace.flagsAll and outspace.flagsCorona that are described below.
 
 An example of using the code is given in the file /examples/RenderExampleEUV.pro (the sample GX Simulator model and EBTEL data are not included).
 
