@@ -11,6 +11,9 @@ function LoadGXmodel, infile, tr_mask=tr_mask, noVoxelID=noVoxelID
  lonC=atan(xC, zC)/!dpi*180
  latC=asin(yC/RSun)/!dpi*180
  
+ pb=pb0r(box.index.date_obs)
+ b0Sun=pb[1]
+ 
  dx=box.dr[0]*RSun
  dy=box.dr[1]*RSun
  dz_uniform=box.dr[2]*RSun
@@ -94,6 +97,7 @@ function LoadGXmodel, infile, tr_mask=tr_mask, noVoxelID=noVoxelID
         corona_base: long(corona_base), $
         DSun: double(DSun), $
         RSun: double(Rsun), $
+        b0Sun: double(b0Sun), $
         lonC: double(lonC), $
         latC: double(latC), $
         dx: double(dx), $
