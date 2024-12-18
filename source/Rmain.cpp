@@ -36,6 +36,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  double *m64=(double*)m32;
  double m_DSun=*(m64++); 
  double m_RSun=*(m64++); 
+ double m_b0Sun=*(m64++);
  double m_lonC=*(m64++);
  double m_latC=*(m64++); 
  double m_dx=*(m64++); 
@@ -273,11 +274,11 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
   CrossP(jvec, LOS, norm_x);
   CrossP(LOS, norm_x, norm_y);
 
-  rotC(r1, m_latC, m_lonC);
-  rotC(r2, m_latC, m_lonC);
-  rotC(LOS, m_latC, m_lonC);
-  rotC(norm_x, m_latC, m_lonC);
-  rotC(norm_y, m_latC, m_lonC); 
+  rotC(r1, m_latC, m_lonC, m_b0Sun);
+  rotC(r2, m_latC, m_lonC, m_b0Sun);
+  rotC(LOS, m_latC, m_lonC, m_b0Sun);
+  rotC(norm_x, m_latC, m_lonC, m_b0Sun);
+  rotC(norm_y, m_latC, m_lonC, m_b0Sun); 
 
   for (int l=0; l<3; l++)
   {

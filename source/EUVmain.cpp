@@ -32,6 +32,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  double *m64=(double*)m32;
  double m_DSun=*(m64++); 
  double m_RSun=*(m64++); 
+ double m_b0Sun=*(m64++);
  double m_lonC=*(m64++);
  double m_latC=*(m64++); 
  double m_dx=*(m64++); 
@@ -301,9 +302,9 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
   double aLOS=sqrt(sqr(LOS[0])+sqr(LOS[1])+sqr(LOS[2]));
   for (int l=0; l<3; l++) LOS[l]/=aLOS;
 
-  rotC(r1, m_latC, m_lonC);
-  rotC(r2, m_latC, m_lonC);
-  rotC(LOS, m_latC, m_lonC);
+  rotC(r1, m_latC, m_lonC, m_b0Sun);
+  rotC(r2, m_latC, m_lonC, m_b0Sun);
+  rotC(LOS, m_latC, m_lonC, m_b0Sun);
 
   for (int l=0; l<3; l++)
   {

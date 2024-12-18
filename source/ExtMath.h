@@ -53,7 +53,7 @@ inline void arrswap(int *a, int i, int j)
 }
 
 void CrossP(double *a, double *b, double *axb);
-void rotC(double *r, double lat, double lon);
+void rotC(double *r, double lat, double lon, double b0);
 int value_locate(double *a, int n, double x);
 
 double LogFactorial(int n);
