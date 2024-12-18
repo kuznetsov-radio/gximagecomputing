@@ -108,7 +108,9 @@ Optionally, for both the microwave and EUV emissions, selective heating of the c
 The output structure outspace contains the fields outspace.flagsAll and outspace.flagsCorona that provide some statistics about the computation process. In particular, flagsAll is a 6-element array with the following data:<br/>
 flagsAll[0] is the total number of voxels crossed by the lines-of-sight.<br/>
 flagsAll[1] is the number of voxels (crossed by the lines-of-sight) in the chromospheric part of the model.<br/>
-flagsAll[2] is the number of voxels (crossed by the lines-of-sight) associated with closed field lines (where the loop length L and average magnetic field <B> are known, and hence the heating rate Q can be computed).<br/>
+flagsAll[2] is the number of voxels (crossed by the lines-of-sight) associated with closed field lines (where the loop length L and average magnetic field B_avg are known, and hence the heating rate Q can be computed). flagsAll[2]=flagsAll[3]+flagsAll[4]+flagsAll[5].<br/>
 flagsAll[3] is the number of voxels (crossed by the lines-of-sight and associated with closed field lines) with the EBTEL table hits (where both L and Q are within the table).<br/>
 flagsAll[4] is the number of voxels (crossed by the lines-of-sight and associated with closed field lines) with the EBTEL table misses due to the loop length (where L is beyond the table).<br/>
-flagsAll[5] is the number of voxels (crossed by the lines-of-sight and associated with closed field lines) with the EBTEL table misses due to the heating rate (where Q is beyond the table).<br/>
+flagsAll[5] is the number of voxels (crossed by the lines-of-sight and associated with closed field lines) with the EBTEL table misses due to the heating rate (where Q is beyond the table).
+
+flagsCorona is similar to flagsAll, but refers only to the coronal part of the model. Therefore, flagsCorona[0] is the total number of voxels belonging to the coronal part of the model and crossed by the lines-of-sight, and flagsCorona[1] is always zero.
