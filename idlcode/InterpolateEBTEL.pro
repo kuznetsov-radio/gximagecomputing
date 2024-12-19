@@ -21,7 +21,7 @@ pro InterpolateEBTEL, Qrun, Lrun, Qarr, Larr, flag, $
 ; flag - 1D array (with NP elements), byte. An element of this array equals 1, if the interpolation for the 
 ;        corresponding (Q, L) pair was successful, and 0, if that point was beyond the EBTEL grid.
                       
- libname='C:\pCloud\Codes\RenderGR\RenderX\x64\Release\RenderGRFF_64.dll'  
+ libname=gx_libpath('rendergrff')
  
  DEM_on=exist(DEM_run)
  DDM_on=exist(DDM_run) 
