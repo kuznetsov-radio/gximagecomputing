@@ -129,6 +129,11 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  double b_yc=*(b64++);
  double b_dx=*(b64++);
  double b_dy=*(b64++);
+
+ b32=(__int32*)b64;
+ int b_projection=*(b32++);
+ int ProjectionParallel=(b_projection & 1)!=0;
+ int ProjectionExact=(b_projection & 2)!=0;
          
  //-------------------------------------
 
@@ -197,6 +202,9 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 
  double z1=0;
  double z2=m_RSun*2;
+ double D_exact=sqrt(sqr(m_RSun*sin(m_latC*M_PI/180))+
+	                 sqr(m_RSun*cos(m_latC*M_PI/180)*sin(m_lonC*M_PI/180))+
+	                 sqr(m_RSun*cos(m_latC*M_PI/180)*cos(m_lonC*M_PI/180)-m_DSun));
 
  double rb[3]; //the bottom front left box boundary
  rb[0]=-m_dx*(m_Nx-1)/2;
@@ -280,25 +288,41 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 
  for (int i=i_start; i<=i_end; i++) for (int j=j_start; j<=j_end; j++)
  {
-  double spx=sin(M_PI/648000*wx[i]);
-  double spy=sin(M_PI/648000*wy[j]);
-  double q=sqrt(1.0-sqr(spx)-sqr(spy));
-  double xD=spx/q;
-  double yD=spy/q;
-
   double r1[3], r2[3], LOS[3];
 
-  r1[0]=(m_DSun-z1)*xD;
-  r1[1]=(m_DSun-z1)*yD;
-  r1[2]=z1;
+  if (!ProjectionParallel)
+  {
+   double spx=sin(M_PI/648000*wx[i]);
+   double spy=sin(M_PI/648000*wy[j]);
+   double q=sqrt(1.0-sqr(spx)-sqr(spy));
+   double xD=spx/q;
+   double yD=spy/q;
 
-  r2[0]=(m_DSun-z2)*xD;
-  r2[1]=(m_DSun-z2)*yD;
-  r2[2]=z2;
+   r1[0]=(m_DSun-z1)*xD;
+   r1[1]=(m_DSun-z1)*yD;
+   r1[2]=z1;
 
-  LOS[0]=(z1-z2)*xD;
-  LOS[1]=(z1-z2)*yD;
-  LOS[2]=z2-z1;
+   r2[0]=(m_DSun-z2)*xD;
+   r2[1]=(m_DSun-z2)*yD;
+   r2[2]=z2;
+
+   LOS[0]=(z1-z2)*xD;
+   LOS[1]=(z1-z2)*yD;
+   LOS[2]=z2-z1;
+  }
+  else
+  {
+   double D=ProjectionExact ? D_exact : m_DSun;
+
+   r1[0]=r2[0]=D*wx[i]*M_PI/648000;
+   r1[1]=r2[1]=D*wy[j]*M_PI/648000;
+   r1[2]=z1;
+   r2[2]=z2;
+
+   LOS[0]=LOS[1]=0;
+   LOS[2]=z2-z1;
+  }
+
   double aLOS=sqrt(sqr(LOS[0])+sqr(LOS[1])+sqr(LOS[2]));
   for (int l=0; l<3; l++) LOS[l]/=aLOS;
 
