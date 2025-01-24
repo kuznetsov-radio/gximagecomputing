@@ -26,21 +26,37 @@ extern "C" int InterpolateEBTEL(int argc, void **argv)
 
  float *Qrun=(float*)argv[1];
  float *Lrun=(float*)argv[2];
- float *DEM_run=(float*)argv[3];
- float *DDM_run=(float*)argv[4];
+ float *logtdem=(float*)argv[3];
+ float *DEM_run=(float*)argv[4];
+ float *DDM_run=(float*)argv[5];
 
- double *Qarr=(double*)argv[5];
- double *Larr=(double*)argv[6];
+ double *Qarr=(double*)argv[6];
+ double *Larr=(double*)argv[7];
 
- double *DEM_arr=(double*)argv[7];
- double *DDM_arr=(double*)argv[8];
- char *flag=(char*)argv[9];
+ double *DEM_arr=(double*)argv[8];
+ double *DDM_arr=(double*)argv[9];
+
+ double *n_DEM=(double*)argv[10];
+ double *T_DEM=(double*)argv[11];
+ double *n_DDM=(double*)argv[12];
+ double *T_DDM=(double*)argv[13];
+
+ char *flag=(char*)argv[14];
 
  double *LgridL=(double*)malloc(NL*sizeof(double));
  for (int j=0; j<NL; j++) LgridL[j]=log((double)Lrun[D2(NQ, 0, j)]);
 
  double *QgridL=(double*)malloc(NQ*NL*sizeof(double));
  for (int i=0; i<NQ*NL; i++) QgridL[i]=log((double)Qrun[i]);
+
+ double *Tarr=(double*)malloc(NT*sizeof(double));
+ double *lnTarr=(double*)malloc(NT*sizeof(double));
+ double ln10=log(10.0);
+ for (int l=0; l<NT; l++) 
+ {
+  lnTarr[l]=logtdem[l]*ln10;
+  Tarr[l]=exp(lnTarr[l]);
+ }
 
  #ifndef LINUX
  concurrency::parallel_for(0, Npoints, [&](int k)
@@ -50,10 +66,14 @@ extern "C" int InterpolateEBTEL(int argc, void **argv)
  for (int k=0; k<Npoints; k++)
  {
  #endif
+
   flag[k]=0;
 
   double Qlog=log(Qarr[k]);
   double Llog=log(Larr[k]);
+
+  double *y1=(double*)malloc(NT*sizeof(double));
+  double *y2=(double*)malloc(NT*sizeof(double));
 
   int Lind=value_locate(LgridL, NL, Llog);
 
@@ -71,26 +91,52 @@ extern "C" int InterpolateEBTEL(int argc, void **argv)
     double dQ2=(Qlog-QgridL[D2(NQ, Qind2, Lind+1)])/(QgridL[D2(NQ, Qind2+1, Lind+1)]-QgridL[D2(NQ, Qind2, Lind+1)]);
 
 	if (DEM_on)
+    {
 	 for (int l=0; l<NT; l++)
-	  DEM_arr[D2(NT, l, k)]=DEM_run[D3(NT, NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
-                            DEM_run[D3(NT, NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
-                            DEM_run[D3(NT, NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
-                            DEM_run[D3(NT, NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
+     {
+	  double DEM=DEM_arr[D2(NT, l, k)]=DEM_run[D3(NT, NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
+                                       DEM_run[D3(NT, NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
+                                       DEM_run[D3(NT, NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
+                                       DEM_run[D3(NT, NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
+      y1[l]=DEM*Tarr[l];
+      y2[l]=y1[l]*Tarr[l];
+     }
+
+     double n2_avg=IntTabulated(lnTarr, y1, NT);
+     n_DEM[k]=sqrt(n2_avg);
+     T_DEM[k]=(n2_avg>0) ? IntTabulated(lnTarr, y2, NT)/n2_avg : 0.0;
+    }
 
 	if (DDM_on)
+    {
  	 for (int l=0; l<NT; l++)
-	  DDM_arr[D2(NT, l, k)]=DDM_run[D3(NT, NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
-                            DDM_run[D3(NT, NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
-                            DDM_run[D3(NT, NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
-                            DDM_run[D3(NT, NQ, l, Qind2+1, Lind+1)]*dL*dQ2; 
+     {
+	  double DDM=DDM_arr[D2(NT, l, k)]=DDM_run[D3(NT, NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
+                                       DDM_run[D3(NT, NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
+                                       DDM_run[D3(NT, NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
+                                       DDM_run[D3(NT, NQ, l, Qind2+1, Lind+1)]*dL*dQ2; 
+      y1[l]=DDM*Tarr[l];
+      y2[l]=y1[l]*Tarr[l];
+     }
+
+     double n_avg=IntTabulated(lnTarr, y1, NT);
+     n_DDM[k]=n_avg;
+     T_DDM[k]=(n_avg>0) ? IntTabulated(lnTarr, y2, NT)/n_avg : 0.0;
+    }
    }
   }
+
+  free(y2);
+  free(y1);
+
  #ifndef LINUX
  });
  #else
  }
  #endif
 
+ free(lnTarr);
+ free(Tarr);
  free(LgridL);
  free(QgridL);
 
