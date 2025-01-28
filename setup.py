@@ -10,7 +10,7 @@ common_compile_flags = ['-std=c++11', '-O3', '-fPIC', '-fopenmp']
 
 compile_flags = {
     'Linux':   ["-DLINUX",   *common_compile_flags],
-    'Windows': ["-DWINDOWS", *common_compile_flags],
+    'Windows': ["-DWINDOWS"],
     'Darwin':  ["-DMACOS",   *common_compile_flags]
 }
 

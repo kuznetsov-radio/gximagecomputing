@@ -1,11 +1,11 @@
 #pragma once
 
-#include <cmath>
-#ifndef WINDOWS
-#define finite isfinite
-#else
+#ifdef WINDOWS
 #define finite _finite
 #define _USE_MATH_DEFINES
+#include <cmath>
+#else
+#define finite isfinite
 #endif
 
 #define dNaN (double(HUGE_VAL))
