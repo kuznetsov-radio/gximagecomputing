@@ -477,7 +477,7 @@ int MW_Transfer(int *Lparms, double *Rparms, double *Parms, double *T_arr, doubl
  return res;
 }
 
-#ifndef LINUX
+#ifdef WINDOWS
 extern "C" __declspec(dllexport) int GET_MW(int argc, void **argv)
 #else
 extern "C" int GET_MW(int argc, void **argv)

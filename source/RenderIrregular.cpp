@@ -33,7 +33,7 @@ int CheckCrossPixel(double xl, double xr, double yb, double yt, double x1, doubl
  return 0;
 }
 
-#ifndef LINUX
+#ifdef WINDOWS
 extern "C" __declspec(dllexport) int RENDER(int argc, void **argv)
 #else
 extern "C" int RENDER(int argc, void **argv)

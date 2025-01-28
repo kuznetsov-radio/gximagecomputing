@@ -28,7 +28,7 @@ void LOGout(const char *fmt, ...)
 
  va_list argptr;
  va_start(argptr, fmt);
- #ifndef LINUX
+ #ifdef WINDOWS
  vsprintf_s(arr, 256, fmt, argptr);
  #else
  vsnprintf(arr, 256, fmt, argptr);

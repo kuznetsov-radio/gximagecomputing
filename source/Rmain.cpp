@@ -8,7 +8,7 @@
 #include "MWtransfer.h"
 #include "GXdefs.h"
 
-#ifndef LINUX
+#ifdef WINDOWS
 #include <ppl.h>
 #include <concrtrm.h>
 #else
@@ -19,7 +19,7 @@
 #define InSize 15
 #define OutSize 7
 
-#ifndef LINUX
+#ifdef WINDOWS
 extern "C" __declspec(dllexport) int ComputeMW_fragment(int argc, void **argv)
 #else
 extern "C" double ComputeMW_fragment(int argc, void **argv)
@@ -152,7 +152,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 
  char *flagsGlobal=(char*)argv[7];
 
- #ifndef LINUX
+ #ifdef WINDOWS
  concurrency::critical_section *cs=(concurrency::critical_section*)argv[8];
  #endif
 
@@ -489,7 +489,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
   }
  }
 
- #ifndef LINUX
+ #ifdef WINDOWS
  if (cs) cs->lock();
  for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) flagsGlobal[i]|=flags[i];
  if (cs) cs->unlock();
@@ -521,7 +521,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  return 0;
 }
 
-#ifndef LINUX
+#ifdef WINDOWS
 extern "C" __declspec(dllexport) int ComputeMW(int argc, void **argv)
 #else
 extern "C" int ComputeMW(int argc, void **argv)
@@ -545,7 +545,7 @@ extern "C" int ComputeMW(int argc, void **argv)
 
  void *SHtable=(argc>5) ? argv[5] : 0;
 
- #ifndef LINUX
+ #ifdef WINDOWS
  concurrency::critical_section cs;
 
  int NtMax=concurrency::GetProcessorCount();
@@ -608,7 +608,7 @@ extern "C" int ComputeMW(int argc, void **argv)
  return 0;
 }
 
-#ifndef LINUX
+#ifdef WINDOWS
 extern "C" __declspec(dllexport) int pyComputeMW(void *model, void *ebtel, void *simbox, void *cparms, void *out)
 #else
 extern "C" int pyComputeMW(void* model, void* ebtel, void* simbox, void* cparms, void* out)

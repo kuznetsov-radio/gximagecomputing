@@ -1,13 +1,13 @@
 #pragma once
 
-#ifdef LINUX
+#ifndef WINDOWS
 #define finite isfinite
+#include <cmath>
 #else
 #define finite _finite
 #endif
 
 #define dNaN (double(HUGE_VAL))
-#include <cmath>
 
 inline double sqr(double x)
 {

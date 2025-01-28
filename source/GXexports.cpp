@@ -3,14 +3,14 @@
 #include "ExtMath.h"
 #include "IDLinterface.h"
 
-#ifndef LINUX
+#ifdef WINDOWS
 #include <ppl.h>
 #else
 #include <omp.h>
 #define __int32 int32_t
 #endif
 
-#ifndef LINUX
+#ifdef WINDOWS
 extern "C" __declspec(dllexport) int InterpolateEBTEL(int argc, void **argv)
 #else
 extern "C" int InterpolateEBTEL(int argc, void **argv)
@@ -58,7 +58,7 @@ extern "C" int InterpolateEBTEL(int argc, void **argv)
   Tarr[l]=exp(lnTarr[l]);
  }
 
- #ifndef LINUX
+ #ifdef WINDOWS
  concurrency::parallel_for(0, Npoints, [&](int k)
  {
  #else
@@ -129,7 +129,7 @@ extern "C" int InterpolateEBTEL(int argc, void **argv)
   free(y2);
   free(y1);
 
- #ifndef LINUX
+ #ifdef WINDOWS
  });
  #else
  }

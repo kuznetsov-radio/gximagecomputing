@@ -7,7 +7,7 @@
 #include "Plasma.h"
 #include "GXdefs.h"
 
-#ifndef LINUX
+#ifdef WINDOWS
 #include <ppl.h>
 #include <concrtrm.h>
 #else
@@ -15,7 +15,7 @@
 #define __int32 int32_t
 #endif
 
-#ifndef LINUX
+#ifdef WINDOWS
 extern "C" __declspec(dllexport) int ComputeEUV_fragment(int argc, void **argv)
 #else
 extern "C" int ComputeEUV_fragment(int argc, void **argv)
@@ -170,7 +170,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 
  char *flagsGlobal=(char*)argv[8];
 
- #ifndef LINUX
+ #ifdef WINDOWS
  concurrency::critical_section *cs=(concurrency::critical_section*)argv[9];
  #endif
 
@@ -349,16 +349,16 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
   ARGV[10]=(void*)zmid;
 
   int res=RENDER(11, ARGV);
-     
+       
   int done=0;
   if (Nvoxels>0) for (int k=Nvoxels-1; k>=0; k--) if (!done)
-  {
+  {               
    flags[VoxList[k]]|=1; //voxels crossed by LOSs
 
    double T_iso=cp_Tbase; //default temperature
    double n_iso=cp_nbase*exp(-h[VoxList[k]]/H_corona); //default density
    int useDEM=0; //default: isothermal
-
+                     
    double Bavg, Lline;
    Bavg=Lline=0;
    
@@ -452,7 +452,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 	}
 	else flags[VoxList[k]]|=16; //EBTEL table miss (L)
    }
-        
+          
    if (useDEM)
    {
     for (int l=0; l<rs_Nch; l++)
@@ -480,7 +480,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  for (int i=i_start; i<=i_end; i++) for (int j=j_start; j<=j_end; j++) for (int l=0; l<rs_Nch; l++)
   o_flux[D3(b_Nx, b_Ny, i, j, l)]=flux[D3(b_Nx, b_Ny, i, j, l)]*norm;
 
- #ifndef LINUX
+ #ifdef WINDOWS
  if (cs) cs->lock();
  for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) flagsGlobal[i]|=flags[i];
  if (cs) cs->unlock();
@@ -517,7 +517,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  return 0;
 }
 
-#ifndef LINUX
+#ifdef WINDOWS
 extern "C" __declspec(dllexport) int ComputeEUV(int argc, void **argv)
 #else
 extern "C" int ComputeEUV(int argc, void **argv)
@@ -541,7 +541,7 @@ extern "C" int ComputeEUV(int argc, void **argv)
 
  void *SHtable=(argc>6) ? argv[6] : 0;
 
- #ifndef LINUX
+ #ifdef WINDOWS
  concurrency::critical_section cs;
 
  int NtMax=concurrency::GetProcessorCount();
