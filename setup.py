@@ -9,15 +9,15 @@ import sys
 common_compile_flags = ['-std=c++11', '-O3', '-fPIC', '-fopenmp']
 
 compile_flags = {
-    'Linux': ["-DLINUX", *common_compile_flags],
-    'Windows': [*common_compile_flags],
-    'Darwin': [*common_compile_flags, "-fdeclspec"]
+    'Linux':   ["-DLINUX",   *common_compile_flags],
+    'Windows': ["-DWINDOWS", *common_compile_flags],
+    'Darwin':  ["-DMACOS",   *common_compile_flags]
 }
 
 link_flags = {
-    'Linux': ["-shared", "-fopenmp", "-lm"],
+    'Linux':   ["-shared", "-fopenmp", "-lm"],
     'Windows': ["-shared", "-fopenmp", "-lm"],
-    'Darwin': ["-fopenmp", "-lm"]
+    'Darwin':             ["-fopenmp", "-lm"]
 }
 
 current_os = platform.system()
