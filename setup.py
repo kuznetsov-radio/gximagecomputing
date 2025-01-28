@@ -11,7 +11,7 @@ common_compile_flags = ['-std=c++11', '-O3', '-fPIC', '-fopenmp']
 compile_flags = {
     'Linux': ["-DLINUX", *common_compile_flags],
     'Windows': [*common_compile_flags],
-    'Darwin': [*common_compile_flags]
+    'Darwin': [*common_compile_flags, "-fdeclspec"]
 }
 
 link_flags = {
