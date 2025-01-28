@@ -7,6 +7,7 @@
 #endif
 
 #define dNaN (double(HUGE_VAL))
+#include <cmath>
 
 inline double sqr(double x)
 {
