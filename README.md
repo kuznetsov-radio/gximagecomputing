@@ -17,7 +17,7 @@ To compute the microwave emission maps, you firstly need to create the input dat
    If the chosen file contains only one EBTEL table (either DEM or DDM), the code loads that table; the /DEM and /DDM keywords are ignored.
 
 3. Define the size and position of the required radio maps, as well as the emission frequencies:<br/>
-   simbox=MakeSimulationBox(xc, yc, dx, dy, Nx, Ny, freqlist [, rot=rot, /parallel, /exact])<br/>
+   simbox=MakeSimulationBox(xc, yc, dx, dy, Nx, Ny, freqlist [, rot=rot, /parallel, /exact, Nthreads=Nthreads])<br/>
    where:<br/>
    xc and yc are the x and y coordinates of the map center (in the helioprojective coordinate system, in arcseconds).<br/>
    dx and dy are the x and y resolutions of the map (in arcseconds).<br/>
@@ -25,7 +25,8 @@ To compute the microwave emission maps, you firstly need to create the input dat
    freqlist is the list (1D array) of the emission frequencies (in GHz) where the maps are to be computed.<br/>
    rot is the optional rotation angle of the simulated radio maps (in degrees). If set, the simulation window is rotated counter-clockwise by this angle; in this case, the center of the resulting map is still at (xc, yc), and the x and y coordinates correspond to the rotated coordinate system. Default: 0.<br/>
    /parallel - if set, the rendering is performed in parallel projection (all lines of sight are parallel to each other); if not set (default), the rendering is performed in perspective projection (all lines of sight intersect at the observer's location).<br/>
-   /exact - is used only together with /parallel. If not set (default), the conversion from arcseconds to kilometers in the parallel projection is performed using the distance from the observer to the center of the Sun. If set, the conversion is performed using the actual distance from the observer to the considered active region. This keyword has no effect for the perspective projection.
+   /exact - is used only together with /parallel. If not set (default), the conversion from arcseconds to kilometers in the parallel projection is performed using the distance from the observer to the center of the Sun. If set, the conversion is performed using the actual distance from the observer to the considered active region. This keyword has no effect for the perspective projection.<br/>
+   Nthreads - number of processor threads used for computing the images. Cannot exceed the number of available processors. Default: a system-defined value (typically, the number of available processors).
    
 5. Define the parameters of the coronal plasma:<br/>
    coronaparms=DefineCoronaParams(Tbase, nbase, Q0, a, b [, /force_isothermal])<br/>
@@ -73,14 +74,15 @@ Computing the EUV emission maps is similar to that for the microwave emission, w
    evenorm and chiantifix: these parameters are applicable to the AIA instrument only (see the SolarSoft function aia_get_response.pro). Default: evenorm=1, chiantifix=1.
 
 5. Define the size and position of the required EUV maps:<br/>
-   simbox=MakeSimulationBoxEUV(xc, yc, dx, dy, Nx, Ny [, /parallel, /exact])<br/>
+   simbox=MakeSimulationBoxEUV(xc, yc, dx, dy, Nx, Ny [, /parallel, /exact, Nthreads=Nthreads])<br/>
    where:<br/>
    xc and yc are the x and y coordinates of the map center (in the helioprojective coordinate system, in arcseconds).<br/>
    dx and dy are the x and y resolutions of the map (in arcseconds).<br/>
    Nx and Ny are the x and y sizes of the map (in pixels).<br/>
    Note that the particular EUV channels cannot be selected: the code computes the emission for all channels specified by the instrumental response table. Also, the code computes the emission as if observed from the Earth; thus for Solar Orbiter and STEREO the map position and pixel size should be corrected accordingly.<br/>
    /parallel - if set, the rendering is performed in parallel projection (all lines of sight are parallel to each other); if not set (default), the rendering is performed in perspective projection (all lines of sight intersect at the observer's location).<br/>
-   /exact - is used only together with /parallel. If not set (default), the conversion from arcseconds to kilometers in the parallel projection is performed using the distance from the observer to the center of the Sun. If set, the conversion is performed using the actual distance from the observer to the considered active region. This keyword has no effect for the perspective projection.
+   /exact - is used only together with /parallel. If not set (default), the conversion from arcseconds to kilometers in the parallel projection is performed using the distance from the observer to the center of the Sun. If set, the conversion is performed using the actual distance from the observer to the considered active region. This keyword has no effect for the perspective projection.<br/>
+   Nthreads - number of processor threads used for computing the images. Cannot exceed the number of available processors. Default: a system-defined value (typically, the number of available processors).
    
 6. Define the parameters of the coronal plasma:<br/>
    coronaparms=DefineCoronaParams(Tbase, nbase, Q0, a, b [, /AddTR])<br/>
