@@ -425,7 +425,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 	   memset(DEM_local, 0, e_NT*sizeof(double));
 
 	   if ((m_VoxelID[VoxList[k]] & 4)!=0) //corona
-	    for (int l=0; l<e_NT; l++)
+	    for (int l=0; l<e_NT; l++) 
 		 DEM_local[l]=e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
                       e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
                       e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
@@ -438,7 +438,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 		double cosphi0=sin(0.5*acos(1.0-dz[VoxList[k]]/m_RSun));
 		double TRfactor=costheta/max(cosphi, cosphi0);
 
-		for (int l=0; l<e_NT; l++)
+		for (int l=0; l<e_NT; l++) 
 		 DEM_local[l]+=((e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
                          e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
                          e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
@@ -452,7 +452,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 	}
 	else flags[VoxList[k]]|=16; //EBTEL table miss (L)
    }
-          
+
    if (useDEM)
    {
     for (int l=0; l<rs_Nch; l++)
@@ -532,6 +532,9 @@ extern "C" int ComputeEUV(int argc, void **argv)
  __int32 *b32=(__int32*)argv[3]; 
  int b_Nx=*(b32++); 
  int b_Ny=*(b32++); 
+ b32++;
+ int projection=*(b32++);
+ int Nthreads=projection>>16;
 
  __int32 *o_flagsAll=(__int32*)argv[5];
  __int32 *o_flagsCorona=o_flagsAll+6;
@@ -545,6 +548,7 @@ extern "C" int ComputeEUV(int argc, void **argv)
  concurrency::critical_section cs;
 
  int NtMax=concurrency::GetProcessorCount();
+ if (Nthreads>0) NtMax=min(Nthreads, NtMax);
  int K=int(b_Ny/NtMax);
  int Np=b_Ny % NtMax;
  int Nm=NtMax-Np;
@@ -570,6 +574,10 @@ extern "C" int ComputeEUV(int argc, void **argv)
   ComputeEUV_fragment(10, ARGV);
  });
  #else
+ int NtMax=omp_get_max_threads();
+ if (Nthreads>NtMax) Nthreads=NtMax;
+ if (Nthreads>0) omp_set_num_threads(Nthreads);
+
  #pragma omp parallel for
  for (int j=0; j<b_Ny; j++)
  {

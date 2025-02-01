@@ -536,7 +536,10 @@ extern "C" int ComputeMW(int argc, void **argv)
  __int32 *b32=(__int32*)argv[2]; 
  int b_Nx=*(b32++); 
  int b_Ny=*(b32++); 
-
+ b32++;
+ int projection=*(b32++);
+ int Nthreads=projection>>16;
+                     
  __int32 *o_flagsAll=(__int32*)argv[4];
  __int32 *o_flagsCorona=o_flagsAll+6;
 
@@ -549,6 +552,7 @@ extern "C" int ComputeMW(int argc, void **argv)
  concurrency::critical_section cs;
 
  int NtMax=concurrency::GetProcessorCount();
+ if (Nthreads>0) NtMax=min(Nthreads, NtMax);
  int K=int(b_Ny/NtMax);
  int Np=b_Ny % NtMax;
  int Nm=NtMax-Np;
@@ -574,6 +578,10 @@ extern "C" int ComputeMW(int argc, void **argv)
   ComputeMW_fragment(9, ARGV);
  });
  #else
+ int NtMax=omp_get_max_threads();
+ if (Nthreads>NtMax) Nthreads=NtMax;
+ if (Nthreads>0) omp_set_num_threads(Nthreads);
+
  #pragma omp parallel for
  for (int j=0; j<b_Ny; j++)
  {
