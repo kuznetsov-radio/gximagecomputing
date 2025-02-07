@@ -32,8 +32,7 @@ To compute the microwave emission maps, you firstly need to create the input dat
    where:<br/>
    Tbase and nbase define the "default" plasma distribution; they are respectively the plasma temperature (in K) and the base plasma density at the bottom of the simulation box (in cm^{-3}). These parameters are used to find the plasma parameters in the voxels where the heating model is not applicable, i.e., either the voxel is associated with an open field line, or the heating parameters are beyond the boundaries of the EBTEL table. In such voxels, the plasma temperature is set to Tbase, and the plasma density is computed using nbase, Tbase, and the barometric formula.<br/>
    Q0, a, and b define the coronal heating model (which is applied to the closed field lines). The heating rate Q at each field line is computed as Q=Q0*(B/B0)^a/(L/L0)^b, where B is the average magnetic field along the line, L is the line half-length, and B0 and L0 are some pre-defined constants (the same as in GX Simulator).<br/>
-   /force_isothermal - if set, the multi-thermal formulae given in the paper of Fleishman, Kuznetsov & Landi (2021) are not used, and the emission is computed using the moments of the DEM or DDM distribution (if both DEM and DDM are provided, the DDM moments are used). This option improves the computation speed greatly, although the results become less accurate.<br/>
-   Note: the option /AddTR (see below) has no effect for the microwave emission.
+   /force_isothermal - if set, the multi-thermal formulae given in the paper of Fleishman, Kuznetsov & Landi (2021) are not used, and the emission is computed using the moments of the DEM or DDM distribution (if both DEM and DDM are provided, the DDM moments are used). This option improves the computation speed greatly, although the results become less accurate.
    
 6. Prepare the memory structure for the simulation results:<br/>
    outspace=ReserveOutputSpace(simbox)<br/>
@@ -55,9 +54,8 @@ An example of using the code is given in the file /examples/RenderExampleMW.pro 
 Computing the EUV emission maps is similar to that for the microwave emission, with a few differences. Firstly, you need to create the input data blocks by calling the following functions:
 
 1. Load the GX Simulator model:<br/>
-   model=LoadGXmodel(modelfile [,tr_mask=tr_mask])<br/>
-   where modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).<br/>
-   The optional parameter tr_mask is a 2D array specifying the 'transition region mask', i.e., defining the regions where the emission from the transition region makes a contribution to the resulting EUV flux (if the /AddTR keyword is set in the DefineCoronaParams function); see GX Simulator (panel 'Transition Region Attributes') for details. By default, the entire transition region is considered.
+   model=LoadGXmodel(modelfile)<br/>
+   where modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).
    
 2. Load the EBTEL tables:<br/>
    ebtel=LoadEBTEL(ebtelfile)<br/>
@@ -84,11 +82,10 @@ Computing the EUV emission maps is similar to that for the microwave emission, w
    Nthreads - number of processor threads used for computing the images. Cannot exceed the number of available processors. Default: a system-defined value (typically, the number of available processors).
    
 6. Define the parameters of the coronal plasma:<br/>
-   coronaparms=DefineCoronaParams(Tbase, nbase, Q0, a, b [, /AddTR])<br/>
+   coronaparms=DefineCoronaParams(Tbase, nbase, Q0, a, b)<br/>
    where:<br/>
    Tbase and nbase define the "default" plasma distribution; they are respectively the plasma temperature (in K) and the base plasma density at the bottom of the simulation box (in cm^{-3}). These parameters are used to find the plasma parameters in the voxels where the heating model is not applicable, i.e., either the voxel is associated with an open field line, or the heating parameters are beyond the boundaries of the EBTEL table. In such voxels, the plasma temperature is set to Tbase, and the plasma density is computed using nbase, Tbase, and the barometric formula.<br/>
    Q0, a, and b define the coronal heating model (which is applied to the closed field lines). The heating rate Q at each field line is computed as Q=Q0*(B/B0)^a/(L/L0)^b, where B is the average magnetic field along the line, L is the line half-length, and B0 and L0 are some pre-defined constants (the same as in GX Simulator).<br/>
-   /AddTR - if set, the EUV contribution from the transition region is added to the emission maps. The emissions from the corona and transition region are computed using the respective DEM tables.<br/>
    Note: the option /force_isothermal (see above) has no effect for the EUV emission.
    
 7. Prepare the memory structure for the simulation results:<br/>
@@ -101,9 +98,9 @@ When the input data are ready, the computation is performed by calling the main 
 r=call_external(libname, 'ComputeEUV', model, ebtel, response, simbox, coronaparms, outspace [, SHtable])<br/>
 where libname is the name of the appropriate executable library, and model, ebtel, response, simbox, coronaparms, and outspace are the structures returned by the above-mentioned functions.
 
-The output structure outspace contains the field flux, which represents the computed EUV flux (in DN s^{-1} pix^{-1}). It is a 3D array with Nx * Ny * Nchannels elements, where Nx and Ny are the x and y sizes of the computed maps, and Nchannels is the number of the EUV channels (defined by the selected instrumental response table). These data can be processed directly, or can be converted into the SolarSoft map object via the procedure<br/>
-ConvertToMapsEUV, outspace, simbox, model, response, mapEUV<br/>
-where the input parameters outspace, simbox, model, and response are the structures returned by the above-mentioned functions, and the output parameter mapEUV is the resulting SolarSoft (multi-channel) map object which represents the computed emission.<br/>
+The output structure outspace contains the fields outspace.fluxCorona and outspace.fluxTR, which represent the computed EUV fluxes (in DN s^{-1} pix^{-1}) from the coronal part of the considered model and from the transition region, respectively. They are 3D arrays with Nx * Ny * Nchannels elements, where Nx and Ny are the x and y sizes of the computed maps, and Nchannels is the number of the EUV channels (defined by the selected instrumental response table). These data can be processed directly, or can be converted into the SolarSoft map objects via the procedure<br/>
+ConvertToMapsEUV, outspace, simbox, model, response, mapCorona, mapTR<br/>
+where the input parameters outspace, simbox, model, and response are the structures returned by the above-mentioned functions, and the output parameters mapCorona and mapTR are the resulting SolarSoft (multi-channel) map objects which represent the computed emission.<br/>
 In addition, the output structure outspace contains the fields outspace.flagsAll and outspace.flagsCorona that are described below.
 
 An example of using the code is given in the file /examples/RenderExampleEUV.pro (the sample GX Simulator model and EBTEL data are not included).
