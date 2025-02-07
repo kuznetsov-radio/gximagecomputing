@@ -147,14 +147,14 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  __int32 *cp32=(__int32*)cp64;
  int cp_mode=*cp32;
  int force_isothermal=(cp_mode & 1)!=0;
- int AddTR=(cp_mode & 4)!=0;
 
  //-------------------------------------
 
  __int32 *o_flagsAll=(__int32*)argv[5];
  __int32 *o_flagsCorona=o_flagsAll+6;
 
- double *o_flux=(double*)(o_flagsCorona+6);
+ double *o_fluxCorona=(double*)(o_flagsCorona+6);
+ double *o_fluxTR=o_fluxCorona+b_Nx*b_Ny*rs_Nch;
 
  //-------------------------------------
 
@@ -184,8 +184,10 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  wy[0]=b_yc-b_dy*(b_Ny-1)/2;
  for (int j=1; j<b_Ny; j++) wy[j]=wy[j-1]+b_dy;
 
- double *flux=(double*)malloc(b_Nx*b_Ny*rs_Nch*sizeof(double));
- memset(flux, 0, b_Nx*b_Ny*rs_Nch*sizeof(double));
+ double *fluxCorona=(double*)malloc(b_Nx*b_Ny*rs_Nch*sizeof(double));
+ double *fluxTR=(double*)malloc(b_Nx*b_Ny*rs_Nch*sizeof(double));
+ memset(fluxCorona, 0, b_Nx*b_Ny*rs_Nch*sizeof(double));
+ memset(fluxTR, 0, b_Nx*b_Ny*rs_Nch*sizeof(double));
 
  double *dz=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
  double *h=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
@@ -213,8 +215,8 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 
  int rs_NT1=0;
  int DEM_idx1=0;
- double *LgridL, *QgridL, *Tgrid, *DEM_local, *rs_logte1, *rs_te1, *rs_all1, *EUV_integrand;
- LgridL=QgridL=Tgrid=DEM_local=rs_logte1=rs_te1=rs_all1=EUV_integrand=0;
+ double *LgridL, *QgridL, *Tgrid, *DEM_local_corona, *DEM_local_TR, *rs_logte1, *rs_te1, *rs_all1, *EUV_integrand;
+ LgridL=QgridL=Tgrid=DEM_local_corona=DEM_local_TR=rs_logte1=rs_te1=rs_all1=EUV_integrand=0;
  Spline **rs_spl_arr;
  rs_spl_arr=0;
 
@@ -229,7 +231,8 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
   Tgrid=(double*)malloc(e_NT*sizeof(double));
   for (int i=0; i<e_NT; i++) Tgrid[i]=pow(10.0, (double)e_logtdem[i]);
 
-  DEM_local=(double*)malloc(e_NT*sizeof(double));
+  DEM_local_corona=(double*)malloc(e_NT*sizeof(double));
+  DEM_local_TR=(double*)malloc(e_NT*sizeof(double));
 
   double Tmin=max(rs_logte[0], e_logtdem[0]);
   double Tmax=min(rs_logte[rs_NT-1], e_logtdem[e_NT-1]);
@@ -351,6 +354,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
   int res=RENDER(11, ARGV);
        
   int done=0;
+  int TR_on=0;
   if (Nvoxels>0) for (int k=Nvoxels-1; k>=0; k--) if (!done)
   {               
    flags[VoxList[k]]|=1; //voxels crossed by LOSs
@@ -422,30 +426,35 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 
 	  if (DEM_on)
 	  {
-	   memset(DEM_local, 0, e_NT*sizeof(double));
+	   useDEM=1;
 
 	   if ((m_VoxelID[VoxList[k]] & 4)!=0) //corona
-	    for (int l=0; l<e_NT; l++) 
-		 DEM_local[l]=e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
-                      e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
-                      e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
-                      e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
-
-	   if (AddTR && ((m_VoxelID[VoxList[k]] & 8)!=0)) //EUV_TR and AddTR
 	   {
+	    for (int l=0; l<e_NT; l++) 
+		 DEM_local_corona[l]=e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
+                             e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
+                             e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
+                             e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
+	   }
+
+	   if ((m_VoxelID[VoxList[k]] & 2)!=0) //TR
+	   {
+		TR_on=1;
+
 		double costheta=abs(m_Bz[VoxList[k]])/sqrt(sqr(m_Bx[VoxList[k]])+sqr(m_By[VoxList[k]])+sqr(m_Bz[VoxList[k]]));
 		double cosphi=abs(LOS[2]);
 		double cosphi0=sin(0.5*acos(1.0-dz[VoxList[k]]/m_RSun));
 		double TRfactor=costheta/max(cosphi, cosphi0);
 
 		for (int l=0; l<e_NT; l++) 
-		 DEM_local[l]+=((e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
+		{
+		 DEM_local_TR[l]=e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
                          e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
                          e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
-                         e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind2+1, Lind+1)]*dL*dQ2)*TRfactor/ds[k]);
+                         e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
+		 DEM_local_TR[l]*=TRfactor;
+		}
 	   } 
-
-	   useDEM=1;
 	  }
 	 }
 	 else flags[VoxList[k]]|=32; //EBTEL table miss (Q) 
@@ -457,8 +466,8 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
    {
     for (int l=0; l<rs_Nch; l++)
 	{
-	 for (int m=0; m<rs_NT1; m++) EUV_integrand[m]=rs_all1[D2(rs_NT1, m, l)]*DEM_local[DEM_idx1+m]*rs_te1[m];
-	 flux[D3(b_Nx, b_Ny, i, j, l)]+=(IntTabulated(rs_logte1, EUV_integrand, rs_NT1)*log(10.0)*ds[k]);
+	 for (int m=0; m<rs_NT1; m++) EUV_integrand[m]=rs_all1[D2(rs_NT1, m, l)]*DEM_local_corona[DEM_idx1+m]*rs_te1[m];
+	 fluxCorona[D3(b_Nx, b_Ny, i, j, l)]+=(IntTabulated(rs_logte1, EUV_integrand, rs_NT1)*log(10.0)*ds[k]);
 	}
    }
    else if (n_iso>0)
@@ -468,17 +477,29 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 	{
 	 double rs_local;
 	 rs_spl_arr[l]->Interpolate(logT_iso, &rs_local, 0);
-	 flux[D3(b_Nx, b_Ny, i, j, l)]+=(sqr(n_iso)*ds[k]*rs_local);
+	 fluxCorona[D3(b_Nx, b_Ny, i, j, l)]+=(sqr(n_iso)*ds[k]*rs_local);
 	}
    }
 
    if ((m_VoxelID[VoxList[k]] & 2)!=0) done=1; //arrived to TR
   }
+
+  if (TR_on)
+  {
+   for (int l=0; l<rs_Nch; l++)
+   {
+	for (int m=0; m<rs_NT1; m++) EUV_integrand[m]=rs_all1[D2(rs_NT1, m, l)]*DEM_local_TR[DEM_idx1+m]*rs_te1[m];
+	fluxTR[D3(b_Nx, b_Ny, i, j, l)]=IntTabulated(rs_logte1, EUV_integrand, rs_NT1)*log(10.0);
+   }
+  }
  }
 
  double norm=b_dx*b_dy/rs_ds;
  for (int i=i_start; i<=i_end; i++) for (int j=j_start; j<=j_end; j++) for (int l=0; l<rs_Nch; l++)
-  o_flux[D3(b_Nx, b_Ny, i, j, l)]=flux[D3(b_Nx, b_Ny, i, j, l)]*norm;
+ {
+  o_fluxCorona[D3(b_Nx, b_Ny, i, j, l)]=fluxCorona[D3(b_Nx, b_Ny, i, j, l)]*norm;
+  o_fluxTR[D3(b_Nx, b_Ny, i, j, l)]=fluxTR[D3(b_Nx, b_Ny, i, j, l)]*norm;
+ }
 
  #ifdef WINDOWS
  if (cs) cs->lock();
@@ -503,14 +524,16 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
   free(rs_spl_arr);
   free(rs_te1);
   free(rs_logte1);
-  free(DEM_local);
+  free(DEM_local_TR);
+  free(DEM_local_corona);
   free(Tgrid);
   free(QgridL);
   free(LgridL);
  }
  free(dz);
  free(h);
- free(flux);
+ free(fluxTR);
+ free(fluxCorona);
  free(wy);
  free(wx);
 
