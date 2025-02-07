@@ -6,8 +6,7 @@ To compute the microwave emission maps, you firstly need to create the input dat
 
 1. Load the GX Simulator model:<br/>
    model=LoadGXmodel(modelfile)<br/>
-   where modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).<br/>
-   Note: the parameter tr_mask (see below) has no effect for the microwave emission.
+   where modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).
    
 2. Load the EBTEL tables:<br/>
    ebtel=LoadEBTEL(ebtelfile [, DEM=DEM, DDM=DDM])<br/>
