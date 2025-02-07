@@ -44,13 +44,27 @@ pro RenderExampleEUV
                  model, ebtel, response, simbox, coronaparms, outspace, SHtable)
  print, 'Elapsed time (main): ', systime(1)-tm, ' s'            
  
- ConvertToMapsEUV, outspace, simbox, model, response, mapEUV
+ ConvertToMapsEUV, outspace, simbox, model, response, mapCorona, mapTR
  
- window, 1, title='EUV map'
+ window, 1, title='EUV map (corona)'
  wset, 1
  loadct, 13, /silent
- m=mapEUV.getmap(2)
+ m=mapCorona.getmap(2)
+ plot_map, m, cbar=1
+ 
+ window, 2, title='EUV map (TR)'
+ wset, 2
+ loadct, 13, /silent
+ m=mapTR.getmap(2)
+ plot_map, m, cbar=1 
+ 
+ window, 3, title='EUV map (corona + TR)'
+ wset, 3
+ loadct, 13, /silent
+ m=mapCorona.getmap(2)
+ mtr=mapTR.getmap(2)
+ m.data+=mtr.data
  plot_map, m, cbar=1
 
- save, mapEUV, filename='C:\OneDrive\EUV\EUVmaps.sav', /compress
+ save, mapCorona, mapTR, filename='C:\OneDrive\EUV\EUVmaps.sav', /compress
 end
