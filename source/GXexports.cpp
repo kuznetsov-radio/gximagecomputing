@@ -94,10 +94,13 @@ extern "C" int InterpolateEBTEL(int argc, void **argv)
     {
 	 for (int l=0; l<NT; l++)
      {
-	  double DEM=DEM_arr[D2(NT, l, k)]=DEM_run[D3(NT, NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
-                                       DEM_run[D3(NT, NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
-                                       DEM_run[D3(NT, NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
-                                       DEM_run[D3(NT, NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
+	  double DEM=DEM_run[D3(NT, NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
+                 DEM_run[D3(NT, NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
+                 DEM_run[D3(NT, NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
+                 DEM_run[D3(NT, NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
+      if (!finite(DEM)) DEM=0;
+      DEM_arr[D2(NT, l, k)]=DEM;
+
       y1[l]=DEM*Tarr[l];
       y2[l]=y1[l]*Tarr[l];
      }
@@ -111,10 +114,13 @@ extern "C" int InterpolateEBTEL(int argc, void **argv)
     {
  	 for (int l=0; l<NT; l++)
      {
-	  double DDM=DDM_arr[D2(NT, l, k)]=DDM_run[D3(NT, NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
-                                       DDM_run[D3(NT, NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
-                                       DDM_run[D3(NT, NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
-                                       DDM_run[D3(NT, NQ, l, Qind2+1, Lind+1)]*dL*dQ2; 
+	  double DDM=DDM_run[D3(NT, NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
+                 DDM_run[D3(NT, NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
+                 DDM_run[D3(NT, NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
+                 DDM_run[D3(NT, NQ, l, Qind2+1, Lind+1)]*dL*dQ2; 
+      if (!finite(DDM)) DDM=0;
+      DDM_arr[D2(NT, l, k)]=DDM;
+
       y1[l]=DDM*Tarr[l];
       y2[l]=y1[l]*Tarr[l];
      }
