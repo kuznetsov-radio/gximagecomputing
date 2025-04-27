@@ -129,6 +129,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  int cp_mode=*cp32;
  int force_isothermal=(cp_mode & 1)!=0;
  int interpolB=(cp_mode & 2)!=0;
+ int aNT=(cp_mode & 4)!=0;
 
  //-------------------------------------
 
@@ -386,7 +387,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 	 ID2=m_corona_ID2[D3(m_Nx, m_Ny, idx_i, idx_j, idx_k-m_chromo_layers)];
 	}
 
-	if (Bavg>0 && (DEM_on || DDM_on))
+	if (Bavg>0 && (DEM_on || DDM_on || aNT))
 	{
 	 flags[VoxList[k]]|=4; //voxels with B and L known
 
@@ -395,47 +396,69 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 	 double Q=cp_Q0*pow(Bavg/Bavg0, cp_a)/pow(Lline/Lline0, cp_b);
 	 if (SHtable) Q*=SHtable[D2(SHsize, ID1-1, ID2-1)];
 	 
-	 double Qlog=log(Q);
-	 double Llog=log(Lline);
-
-	 int Lind=value_locate(LgridL, e_NL, Llog);
-
-	 if (Lind>=0 && Lind<(e_NL-1))
+	 if (DEM_on || DDM_on)
 	 {
-	  int Qind1=value_locate(QgridL+Lind*e_NQ, e_NQ, Qlog);
-	  int Qind2=value_locate(QgridL+(Lind+1)*e_NQ, e_NQ, Qlog);
+	  double Qlog=log(Q);
+	  double Llog=log(Lline);
 
-	  if (Qind1>=0 && Qind1<(e_NQ-1) && Qind2>=0 && Qind2<(e_NQ-1))
+	  int EBTEL_hit=0;
+
+	  int Lind=value_locate(LgridL, e_NL, Llog);
+
+	  if (Lind>=0 && Lind<(e_NL-1))
 	  {
-	   flags[VoxList[k]]|=8; //EBTEL table hit
+	   int Qind1=value_locate(QgridL+Lind*e_NQ, e_NQ, Qlog);
+	   int Qind2=value_locate(QgridL+(Lind+1)*e_NQ, e_NQ, Qlog);
 
-	   double dL=(Llog-LgridL[Lind])/(LgridL[Lind+1]-LgridL[Lind]);
-       double dQ1=(Qlog-QgridL[D2(e_NQ, Qind1, Lind)])/(QgridL[D2(e_NQ, Qind1+1, Lind)]-QgridL[D2(e_NQ, Qind1, Lind)]);
-       double dQ2=(Qlog-QgridL[D2(e_NQ, Qind2, Lind+1)])/(QgridL[D2(e_NQ, Qind2+1, Lind+1)]-QgridL[D2(e_NQ, Qind2, Lind+1)]);
-
-	   if (DEM_on)
+	   if (Qind1>=0 && Qind1<(e_NQ-1) && Qind2>=0 && Qind2<(e_NQ-1))
 	   {
-		for (int l=0; l<e_NT; l++)
-		 DEM_arr[D2(e_NT, l, k)]=e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
-                                 e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
-                                 e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
-                                 e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
-		Parms[D2(InSize, 11, k)]=0; //DEM on
-	   }
+	    flags[VoxList[k]]|=8; //EBTEL table hit
 
-	   if (DDM_on)
-	   {
-		for (int l=0; l<e_NT; l++)
-		 DDM_arr[D2(e_NT, l, k)]=e_DDM_cor_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
-                                 e_DDM_cor_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
-                                 e_DDM_cor_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
-                                 e_DDM_cor_run[D3(e_NT, e_NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
-		Parms[D2(InSize, 12, k)]=0; //DDM on
+	    EBTEL_hit=1;
+
+	    double dL=(Llog-LgridL[Lind])/(LgridL[Lind+1]-LgridL[Lind]);
+        double dQ1=(Qlog-QgridL[D2(e_NQ, Qind1, Lind)])/(QgridL[D2(e_NQ, Qind1+1, Lind)]-QgridL[D2(e_NQ, Qind1, Lind)]);
+        double dQ2=(Qlog-QgridL[D2(e_NQ, Qind2, Lind+1)])/(QgridL[D2(e_NQ, Qind2+1, Lind+1)]-QgridL[D2(e_NQ, Qind2, Lind+1)]);
+
+	    if (DEM_on)
+	    {
+		 for (int l=0; l<e_NT; l++)
+		  DEM_arr[D2(e_NT, l, k)]=e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
+                                  e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
+                                  e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
+                                  e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
+		 Parms[D2(InSize, 11, k)]=0; //DEM on
+	    }
+
+	    if (DDM_on)
+	    {
+		 for (int l=0; l<e_NT; l++)
+		  DDM_arr[D2(e_NT, l, k)]=e_DDM_cor_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
+                                  e_DDM_cor_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
+                                  e_DDM_cor_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
+                                  e_DDM_cor_run[D3(e_NT, e_NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
+		 Parms[D2(InSize, 12, k)]=0; //DDM on
+	    }
 	   }
+	   else flags[VoxList[k]]|=32; //EBTEL table miss (Q) 
 	  }
-	  else flags[VoxList[k]]|=32; //EBTEL table miss (Q) 
+	  else flags[VoxList[k]]|=16; //EBTEL table miss (L)
+
+	  if (!EBTEL_hit && aNT)
+	  {
+	   double n0a, T0a;
+	   FindAnalyticalNT(Q, Lline, &n0a, &T0a);
+	   Parms[D2(InSize, 1, k)]=T0a; 
+	   Parms[D2(InSize, 2, k)]=n0a; 
+	  }
 	 }
-	 else flags[VoxList[k]]|=16; //EBTEL table miss (L)
+	 else if (aNT)
+	 {
+	  double n0a, T0a;
+	  FindAnalyticalNT(Q, Lline, &n0a, &T0a);
+	  Parms[D2(InSize, 1, k)]=T0a; 
+	  Parms[D2(InSize, 2, k)]=n0a; 
+	 }
 	}
 
 	double Bx, By, Bz;

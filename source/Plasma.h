@@ -17,3 +17,4 @@ void FindPlasmaDispersion(double f, double f_p, double f_B, double theta, int si
 	                      double *N, double *FZh, double *L, double *T, double *st_out, double *ct_out);
 double SahaH(double n0, double T0);
 void FindIonizationsSolar(double n0, double T0, double *n_e, double *n_H, double *n_He);
+void FindAnalyticalNT(double Q, double L, double *n, double *T);

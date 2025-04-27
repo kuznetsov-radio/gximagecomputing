@@ -147,6 +147,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  __int32 *cp32=(__int32*)cp64;
  int cp_mode=*cp32;
  int force_isothermal=(cp_mode & 1)!=0;
+ int aNT=(cp_mode & 4)!=0;
 
  //-------------------------------------
 
@@ -217,8 +218,9 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  int DEM_idx1=0;
  double *LgridL, *QgridL, *Tgrid, *DEM_local_corona, *DEM_local_TR, *rs_logte1, *rs_te1, *rs_all1, *EUV_integrand;
  LgridL=QgridL=Tgrid=DEM_local_corona=DEM_local_TR=rs_logte1=rs_te1=rs_all1=EUV_integrand=0;
- Spline **rs_spl_arr;
- rs_spl_arr=0;
+
+ Spline **rs_spl_arr=(Spline**)malloc(rs_Nch*sizeof(Spline*));
+ for (int j=0; j<rs_Nch; j++) rs_spl_arr[j]=new Spline(rs_NT, rs_logte, rs_all+j*rs_NT);
 
  if (DEM_on)
  {
@@ -254,14 +256,8 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
    rs_te1[i]=pow(10.0, rs_logte1[i]);
   }
      
-  rs_spl_arr=(Spline**)malloc(rs_Nch*sizeof(Spline*));
   rs_all1=(double*)malloc(rs_NT1*rs_Nch*sizeof(double));
-  for (int j=0; j<rs_Nch; j++)
-  {
-   rs_spl_arr[j]=new Spline(rs_NT, rs_logte, rs_all+j*rs_NT);
-
-   for (int i=0; i<rs_NT1; i++) rs_spl_arr[j]->Interpolate(rs_logte1[i], rs_all1+i+j*rs_NT1, 0);
-  }
+  for (int j=0; j<rs_Nch; j++) for (int i=0; i<rs_NT1; i++) rs_spl_arr[j]->Interpolate(rs_logte1[i], rs_all1+i+j*rs_NT1, 0);
 
   EUV_integrand=(double*)malloc(rs_NT1*sizeof(double));
  }
@@ -397,7 +393,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 	ID2=m_corona_ID2[D3(m_Nx, m_Ny, idx_i, idx_j, idx_k-m_chromo_layers)];
    }
 
-   if (Bavg>0 && DEM_on)
+   if (Bavg>0 && (DEM_on || aNT))
    {
 	flags[VoxList[k]]|=4; //voxels with B and L known
 
@@ -406,60 +402,70 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 	double Q=cp_Q0*pow(Bavg/Bavg0, cp_a)/pow(Lline/Lline0, cp_b);
 	if (SHtable) Q*=SHtable[D2(SHsize, ID1-1, ID2-1)];
 	 
-	double Qlog=log(Q);
-	double Llog=log(Lline);
-
-	int Lind=value_locate(LgridL, e_NL, Llog);
-
-	if (Lind>=0 && Lind<(e_NL-1))
+    if (DEM_on)
 	{
-	 int Qind1=value_locate(QgridL+Lind*e_NQ, e_NQ, Qlog);
-	 int Qind2=value_locate(QgridL+(Lind+1)*e_NQ, e_NQ, Qlog);
+	 double Qlog=log(Q);
+	 double Llog=log(Lline);
 
-	 if (Qind1>=0 && Qind1<(e_NQ-1) && Qind2>=0 && Qind2<(e_NQ-1))
+	 int EBTEL_hit=0;
+
+	 int Lind=value_locate(LgridL, e_NL, Llog);
+
+	 if (Lind>=0 && Lind<(e_NL-1))
 	 {
-	  flags[VoxList[k]]|=8; //EBTEL table hit
+	  int Qind1=value_locate(QgridL+Lind*e_NQ, e_NQ, Qlog);
+	  int Qind2=value_locate(QgridL+(Lind+1)*e_NQ, e_NQ, Qlog);
 
-	  double dL=(Llog-LgridL[Lind])/(LgridL[Lind+1]-LgridL[Lind]);
-      double dQ1=(Qlog-QgridL[D2(e_NQ, Qind1, Lind)])/(QgridL[D2(e_NQ, Qind1+1, Lind)]-QgridL[D2(e_NQ, Qind1, Lind)]);
-      double dQ2=(Qlog-QgridL[D2(e_NQ, Qind2, Lind+1)])/(QgridL[D2(e_NQ, Qind2+1, Lind+1)]-QgridL[D2(e_NQ, Qind2, Lind+1)]);
-
-	  if (DEM_on)
+	  if (Qind1>=0 && Qind1<(e_NQ-1) && Qind2>=0 && Qind2<(e_NQ-1))
 	  {
-	   useDEM=1;
+	   flags[VoxList[k]]|=8; //EBTEL table hit
 
-	   if ((m_VoxelID[VoxList[k]] & 4)!=0) //corona
+	   EBTEL_hit=1;
+
+	   double dL=(Llog-LgridL[Lind])/(LgridL[Lind+1]-LgridL[Lind]);
+       double dQ1=(Qlog-QgridL[D2(e_NQ, Qind1, Lind)])/(QgridL[D2(e_NQ, Qind1+1, Lind)]-QgridL[D2(e_NQ, Qind1, Lind)]);
+       double dQ2=(Qlog-QgridL[D2(e_NQ, Qind2, Lind+1)])/(QgridL[D2(e_NQ, Qind2+1, Lind+1)]-QgridL[D2(e_NQ, Qind2, Lind+1)]);
+
+	   if (DEM_on)
 	   {
-	    for (int l=0; l<e_NT; l++) 
-		 DEM_local_corona[l]=e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
-                             e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
-                             e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
-                             e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
+	    useDEM=1;
+
+	    if ((m_VoxelID[VoxList[k]] & 4)!=0) //corona
+	    {
+	     for (int l=0; l<e_NT; l++) 
+		  DEM_local_corona[l]=e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
+                              e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
+                              e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
+                              e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
+	    }
+
+	    if ((m_VoxelID[VoxList[k]] & 2)!=0) //TR
+	    {
+		 TR_on=1;
+
+		 double costheta=abs(m_Bz[VoxList[k]])/sqrt(sqr(m_Bx[VoxList[k]])+sqr(m_By[VoxList[k]])+sqr(m_Bz[VoxList[k]]));
+		 double cosphi=abs(LOS[2]);
+		 double cosphi0=sin(0.5*acos(1.0-dz[VoxList[k]]/m_RSun));
+		 double TRfactor=costheta/max(cosphi, cosphi0);
+
+		 for (int l=0; l<e_NT; l++) 
+		 {
+		  DEM_local_TR[l]=e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
+                          e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
+                          e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
+                          e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
+		  DEM_local_TR[l]*=TRfactor;
+		 }
+	    } 
 	   }
-
-	   if ((m_VoxelID[VoxList[k]] & 2)!=0) //TR
-	   {
-		TR_on=1;
-
-		double costheta=abs(m_Bz[VoxList[k]])/sqrt(sqr(m_Bx[VoxList[k]])+sqr(m_By[VoxList[k]])+sqr(m_Bz[VoxList[k]]));
-		double cosphi=abs(LOS[2]);
-		double cosphi0=sin(0.5*acos(1.0-dz[VoxList[k]]/m_RSun));
-		double TRfactor=costheta/max(cosphi, cosphi0);
-
-		for (int l=0; l<e_NT; l++) 
-		{
-		 DEM_local_TR[l]=e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
-                         e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
-                         e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
-                         e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
-		 DEM_local_TR[l]*=TRfactor;
-		}
-	   } 
 	  }
+	  else flags[VoxList[k]]|=32; //EBTEL table miss (Q) 
 	 }
-	 else flags[VoxList[k]]|=32; //EBTEL table miss (Q) 
+	 else flags[VoxList[k]]|=16; //EBTEL table miss (L)
+
+	 if (!EBTEL_hit && aNT) FindAnalyticalNT(Q, Lline, &n_iso, &T_iso);
 	}
-	else flags[VoxList[k]]|=16; //EBTEL table miss (L)
+    else if (aNT) FindAnalyticalNT(Q, Lline, &n_iso, &T_iso);
    }
 
    if (useDEM)
@@ -516,12 +522,12 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  free(ds);
  free(VoxList);
  free(flags);
+ for (int j=0; j<rs_Nch; j++) delete rs_spl_arr[j];
+ free(rs_spl_arr);
  if (DEM_on)
  {
   free(EUV_integrand);
   free(rs_all1);
-  for (int j=0; j<rs_Nch; j++) delete rs_spl_arr[j];
-  free(rs_spl_arr);
   free(rs_te1);
   free(rs_logte1);
   free(DEM_local_TR);

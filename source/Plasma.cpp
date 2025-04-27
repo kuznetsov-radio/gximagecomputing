@@ -91,3 +91,48 @@ void FindIonizationsSolar(double n0, double T0, double *n_e, double *n_H, double
  *n_He=n_Hetotal*(1.0-a12);
  *n_e=n_p+n_Hetotal*(a12+a2)+n_Htotal*1e-3;
 }
+
+void FindAnalyticalNT(double Q, double L, double *n, double *T)
+{
+ *T=pow(Q*sqr(L)/4.3e-7, 2.0/7);
+ double lgT=log10(*T);
+
+ double Lambda0, b;
+ if (lgT<=4.97)
+ {
+  Lambda0=1.09e-31;
+  b=2;
+ }
+ else if (lgT<=5.67)
+ {
+  Lambda0=8.87e-17;
+  b=-1;
+ }
+ else if (lgT<=6.18)
+ {
+  Lambda0=1.90e-22;
+  b=0;
+ }
+ else if (lgT<=6.55)
+ {
+  Lambda0=3.53e-13;
+  b=-3.0/2;
+ }
+ else if (lgT<=6.90)
+ {
+  Lambda0=3.46e-25;
+  b=1.0/3;
+ }
+ else if (lgT<=7.63)
+ {
+  Lambda0=5.49e-16;
+  b=-1;
+ }
+ else
+ {
+  Lambda0=1.96e-27;
+  b=1.0/2;
+ }
+
+ *n=sqrt(Q/3/Lambda0/pow(*T, b));
+}
