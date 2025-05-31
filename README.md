@@ -5,8 +5,10 @@ Quick start: see the files /examples/RenderExampleMW.pro and /examples/RenderExa
 To compute the microwave emission maps, you firstly need to create the input data blocks by calling the following functions:
 
 1. Load the GX Simulator model:<br/>
-   model=LoadGXmodel(modelfile)<br/>
-   where modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).
+   model=LoadGXmodel(modelfile [, newTime=newTime])<br/>
+   where:<br/>
+   modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).<br/>
+   newTime is the new date and time in a format accepted by the anytim() function. If specified, the model is rotated to the new date and time.
    
 2. Load the EBTEL tables:<br/>
    ebtel=LoadEBTEL(ebtelfile [, DEM=DEM, DDM=DDM])<br/>
@@ -27,7 +29,7 @@ To compute the microwave emission maps, you firstly need to create the input dat
    /exact - is used only together with /parallel. If not set (default), the conversion from arcseconds to kilometers in the parallel projection is performed using the distance from the observer to the center of the Sun. If set, the conversion is performed using the actual distance from the observer to the considered active region. This keyword has no effect for the perspective projection.<br/>
    Nthreads - number of processor threads used for computing the images. Cannot exceed the number of available processors. Default: a system-defined value (typically, the number of available processors).
    
-5. Define the parameters of the coronal plasma:<br/>
+4. Define the parameters of the coronal plasma:<br/>
    coronaparms=DefineCoronaParams(Tbase, nbase, Q0, a, b [, /force_isothermal, /analyticalNT])<br/>
    where:<br/>
    Tbase and nbase are respectively the plasma temperature (in K) and the base plasma density at the bottom of the simulation box (in cm^{-3}). These parameters are used to find the plasma parameters in the voxels associated with open field lines, or (if the keyword /analyticalNT is not set) the heating parameters (Q, L) in closed field lines are beyond the boundaries of the EBTEL table. In such voxels, the plasma temperature is set to Tbase, and the plasma density is computed using nbase, Tbase, and the barometric formula.<br/>
@@ -35,11 +37,11 @@ To compute the microwave emission maps, you firstly need to create the input dat
    /force_isothermal - if set, the multi-thermal formulae given in the paper of Fleishman, Kuznetsov & Landi (2021) are not used, and the emission is computed using the moments of the DEM or DDM distribution (if both DEM and DDM are provided, the DDM moments are used). This option improves the computation speed greatly, although the results become less accurate.<br/>
    /analyticalNT - if set, then the plasma density and temperature in the voxels associated with closed field lines with the heating parameters (Q, L) beyond the boundaries of the used EBTEL table are computed using approximate analytical formulae for continuosly heated coronal loops. If not set, the isothermal barometric formula with the temperature Tbase and the base density nbase is used in such voxels. 
    
-6. Prepare the memory structure for the simulation results:<br/>
+5. Prepare the memory structure for the simulation results:<br/>
    outspace=ReserveOutputSpace(simbox)<br/>
    where simbox is the structure returned by the MakeSimulationBox function.
 
-7. Optionally: prepare the table SHtable defining selective heating of the coronal magnetic field lines (see below).
+6. Optionally: prepare the table SHtable defining selective heating of the coronal magnetic field lines (see below).
    
 When the input data are ready, the computation is performed by calling the main executable module (RenderGRFF_32.dll, RenderGRFF_64.dll, or RenderGRFF.so) via the call_external function:<br/>
 r=call_external(libname, 'ComputeMW', model, ebtel, simbox, coronaparms, outspace [, SHtable])<br/>
@@ -55,8 +57,10 @@ An example of using the code is given in the file /examples/RenderExampleMW.pro 
 Computing the EUV emission maps is similar to that for the microwave emission, with a few differences. Firstly, you need to create the input data blocks by calling the following functions:
 
 1. Load the GX Simulator model:<br/>
-   model=LoadGXmodel(modelfile)<br/>
-   where modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).
+   model=LoadGXmodel(modelfile [, newTime=newTime])<br/>
+   where:<br/>
+   modelfile is the name of the GX Simulator model file (the model must contain the field line information and the chromospheric part).<br/>
+   newTime is the new date and time in a format accepted by the anytim() function. If specified, the model is rotated to the new date and time.
    
 2. Load the EBTEL tables:<br/>
    ebtel=LoadEBTEL(ebtelfile)<br/>
@@ -71,7 +75,7 @@ Computing the EUV emission maps is similar to that for the microwave emission, w
    instrument is the name of the chosen instrument. Currently, the following instruments are supported: 'AIA', 'AIA2', 'TRACE', 'SXT', 'SOLO-FSI', 'SOLO-HRI', 'STEREO-A', 'STEREO-B'. Default: 'AIA'.<br/>
    evenorm and chiantifix: these parameters are applicable to the AIA instrument only (see the SolarSoft function aia_get_response.pro). Default: evenorm=1, chiantifix=1.
 
-5. Define the size and position of the required EUV maps:<br/>
+4. Define the size and position of the required EUV maps:<br/>
    simbox=MakeSimulationBoxEUV(xc, yc, dx, dy, Nx, Ny [, /parallel, /exact, Nthreads=Nthreads])<br/>
    where:<br/>
    xc and yc are the x and y coordinates of the map center (in the helioprojective coordinate system, in arcseconds).<br/>
@@ -82,7 +86,7 @@ Computing the EUV emission maps is similar to that for the microwave emission, w
    /exact - is used only together with /parallel. If not set (default), the conversion from arcseconds to kilometers in the parallel projection is performed using the distance from the observer to the center of the Sun. If set, the conversion is performed using the actual distance from the observer to the considered active region. This keyword has no effect for the perspective projection.<br/>
    Nthreads - number of processor threads used for computing the images. Cannot exceed the number of available processors. Default: a system-defined value (typically, the number of available processors).
    
-6. Define the parameters of the coronal plasma:<br/>
+5. Define the parameters of the coronal plasma:<br/>
    coronaparms=DefineCoronaParams(Tbase, nbase, Q0, a, b [, /analyticalNT])<br/>
    where:<br/>
    Tbase and nbase are respectively the plasma temperature (in K) and the base plasma density at the bottom of the simulation box (in cm^{-3}). These parameters are used to find the plasma parameters in the voxels associated with open field lines, or (if the keyword /analyticalNT is not set) the heating parameters (Q, L) in closed field lines are beyond the boundaries of the EBTEL table. In such voxels, the plasma temperature is set to Tbase, and the plasma density is computed using nbase, Tbase, and the barometric formula.<br/>
@@ -90,11 +94,11 @@ Computing the EUV emission maps is similar to that for the microwave emission, w
    /analyticalNT - if set, then the plasma density and temperature in the voxels associated with closed field lines with the heating parameters (Q, L) beyond the boundaries of the used EBTEL table are computed using approximate analytical formulae for continuosly heated coronal loops. If not set, the isothermal barometric formula with the temperature Tbase and the base density nbase is used in such voxels. <br/>
    Note: the option /force_isothermal (see above) has no effect for the EUV emission.
    
-7. Prepare the memory structure for the simulation results:<br/>
+6. Prepare the memory structure for the simulation results:<br/>
    outspace=ReserveOutputSpaceEUV(simbox, response)<br/>
    where simbox is the structure returned by the MakeSimulationBox function, and response is the structure returned by the LoadEUVresponse function.
 
-8. Optionally: prepare the table SHtable defining selective heating of the coronal magnetic field lines (see below).
+7. Optionally: prepare the table SHtable defining selective heating of the coronal magnetic field lines (see below).
    
 When the input data are ready, the computation is performed by calling the main executable module (RenderGRFF_32.dll, RenderGRFF_64.dll, or RenderGRFF.so) via the call_external function:<br/>
 r=call_external(libname, 'ComputeEUV', model, ebtel, response, simbox, coronaparms, outspace [, SHtable])<br/>
