@@ -22,20 +22,17 @@ void rotC(double *r, double lat, double lon, double b0)
 
  double r1[3], r2[3];
 
- r1[0]=r[0]*clon-r[2]*slon;
- r1[1]=r[1]; 
- r1[2]=r[0]*slon+r[2]*clon;
+ r1[0]= r[0]; 
+ r1[1]= r[2]*sb0+r[1]*cb0;
+ r1[2]= r[2]*cb0-r[1]*sb0;
 
- r2[0]= r1[0]; 
- r2[1]=-r1[2]*slat+r1[1]*clat;
- r2[2]= r1[2]*clat+r1[1]*slat;
+ r2[0]=r1[0]*clon-r1[2]*slon;
+ r2[1]=r1[1]; 
+ r2[2]=r1[0]*slon+r1[2]*clon;
 
- double psi=atan(sb0*slon/(sb0*clon*slat-cb0*clat));
- double spsi=sin(psi);
- double cpsi=cos(psi);
- r[0]=r2[0]*cpsi-r2[1]*spsi;
- r[1]=r2[0]*spsi+r2[1]*cpsi;
- r[2]=r2[2];
+ r[0]= r2[0]; 
+ r[1]=-r2[2]*slat+r2[1]*clat;
+ r[2]= r2[2]*clat+r2[1]*slat;
 }
 
 int value_locate(double *a, int n, double x)

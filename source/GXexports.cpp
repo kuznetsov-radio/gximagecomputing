@@ -23,6 +23,7 @@ extern "C" int InterpolateEBTEL(int argc, void **argv)
  int NT=Lparms[3];
  int DEM_on=Lparms[4];
  int DDM_on=Lparms[5];
+ int NTonly=Lparms[6];
 
  float *Qrun=(float*)argv[1];
  float *Lrun=(float*)argv[2];
@@ -99,7 +100,7 @@ extern "C" int InterpolateEBTEL(int argc, void **argv)
                  DEM_run[D3(NT, NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
                  DEM_run[D3(NT, NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
       if (!finite(DEM)) DEM=0;
-      DEM_arr[D2(NT, l, k)]=DEM;
+      if (!NTonly) DEM_arr[D2(NT, l, k)]=DEM;
 
       y1[l]=DEM*Tarr[l];
       y2[l]=y1[l]*Tarr[l];
@@ -119,7 +120,7 @@ extern "C" int InterpolateEBTEL(int argc, void **argv)
                  DDM_run[D3(NT, NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
                  DDM_run[D3(NT, NQ, l, Qind2+1, Lind+1)]*dL*dQ2; 
       if (!finite(DDM)) DDM=0;
-      DDM_arr[D2(NT, l, k)]=DDM;
+      if (!NTonly) DDM_arr[D2(NT, l, k)]=DDM;
 
       y1[l]=DDM*Tarr[l];
       y2[l]=y1[l]*Tarr[l];

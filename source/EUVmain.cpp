@@ -203,7 +203,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
   for (int k=0; k<m_Nz; k++) h[D3(m_Nx, m_Ny, i, j, k)]-=dz[D3(m_Nx, m_Ny, i, j, k)]/2;
  }
 
- double z1=0;
+ double z1=-m_RSun;
  double z2=m_RSun*2;
  double D_exact=sqrt(sqr(m_RSun*sin(m_latC*M_PI/180))+
 	                 sqr(m_RSun*cos(m_latC*M_PI/180)*sin(m_lonC*M_PI/180))+

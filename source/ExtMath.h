@@ -7,7 +7,7 @@
 #define finite _finite
 #endif
 
-#define dNaN (double(HUGE_VAL))
+#define dNaN (double(NAN))
 
 inline double sqr(double x)
 {
