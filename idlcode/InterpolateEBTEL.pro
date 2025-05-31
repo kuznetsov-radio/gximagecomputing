@@ -1,6 +1,6 @@
 pro InterpolateEBTEL, Qrun, Lrun, logtdem, Qarr, Larr, flag, $
                       DEM_run=DEM_run, DDM_run=DDM_run, DEM_arr=DEM_arr, DDM_arr=DDM_arr, $
-                      n_DEM=n_DEM, T_DEM=T_DEM, n_DDM=n_DDM, T_DDM=T_DDM
+                      n_DEM=n_DEM, T_DEM=T_DEM, n_DDM=n_DDM, T_DDM=T_DDM, NTonly=NTonly
 ;The code computes the local DEM or/and DDM distributions for the specified values of the heating rate Q and 
 ;magnetic loop length L, using the pre-computed EBTEL tables. The bilinear interpolation is used.
 ;
@@ -14,6 +14,9 @@ pro InterpolateEBTEL, Qrun, Lrun, logtdem, Qarr, Larr, flag, $
 ;                          tables must be specified.
 ; Qarr and Larr - the (Q, L) values where the DEM or/and DDM should be computed, scalars or 1D arrays
 ;                 (with the same sizes), double.
+; /NTonly - if set, the code does not return the resulting interpolated DEM or/and DDM distributions DEM_arr or/and 
+;           DDM_arr, but only their moments (n_DEM and T_DEM) or/and (n_DDM and T_DDM). In this case, the output
+;           parameters DEM_arr or/and DDM_arr need not to be specified.
 ;Note that the parameters Qrun, Lrun, logtdem, DEM_run, and DDM_run must be in the single-precision (float) format, while
 ;the Qarr and Larr should be in the double-precision (double) format; a type mismatch will result in a crash.
 ;
@@ -45,17 +48,17 @@ pro InterpolateEBTEL, Qrun, Lrun, logtdem, Qarr, Larr, flag, $
  NL=s[2]
  NP=n_elements(Qarr)                 
 
- Lparms=long([NP, NQ, NL, NT, DEM_on, DDM_on])
+ Lparms=long([NP, NQ, NL, NT, DEM_on, DDM_on, keyword_set(NTonly)])
  
  flag=bytarr(NP)
  
  if DEM_on then begin
-  DEM_arr=dblarr(NT, NP)
+  DEM_arr=keyword_set(NTonly) ? 0 : dblarr(NT, NP)
   n_DEM=dblarr(NP)
   T_DEM=dblarr(NP)
  endif
  if DDM_on then begin
-  DDM_arr=dblarr(NT, NP)
+  DDM_arr=keyword_set(NTonly) ? 0 : dblarr(NT, NP)
   n_DDM=dblarr(NP)
   T_DDM=dblarr(NP)
  endif

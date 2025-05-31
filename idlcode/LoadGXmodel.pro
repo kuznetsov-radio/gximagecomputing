@@ -1,18 +1,23 @@
-function LoadGXmodel, infile, noVoxelID=noVoxelID
+function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime
  restore, infile
  
  obstime=anytim(box.index.date_obs)
  
  setenv, 'WCS_RSUN=6.96d8' ;the same command as in GX Simulator routines
  wcs=fitshead2wcs(box.index)
- wcs_convert_from_coord, wcs, wcs.crval, 'hcc', xC, yC, zC, length_units='cm'
- DSun=wcs.position.dsun_obs*1d2
+ wcs_convert_from_coord, wcs, wcs.crval, 'hg', lonC, latC
  RSun=wcs_rsun(unit='cm')
- lonC=atan(xC, zC)/!dpi*180
- latC=asin(yC/RSun)/!dpi*180
  
- pb=pb0r(box.index.date_obs)
- b0Sun=pb[1]
+ if exist(newTime) then begin
+  obstime1=anytim(newTime)
+  ddays=(obstime1-obstime)/86400
+  lonC+=diff_rot(ddays, latC, /synodic)
+  obstime=obstime1
+ endif
+ 
+ a=get_sun(anytim(obsTime, /ex))
+ DSun=a[0]*1.495978707d13 
+ b0Sun=a[11]
  
  dx=box.dr[0]*RSun
  dy=box.dr[1]*RSun
