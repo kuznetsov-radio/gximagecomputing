@@ -190,17 +190,27 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  memset(fluxCorona, 0, b_Nx*b_Ny*rs_Nch*sizeof(double));
  memset(fluxTR, 0, b_Nx*b_Ny*rs_Nch*sizeof(double));
 
- double *dz=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
- double *h=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
+ double *dz, *h;
 
- for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) dz[i]=(double)m_dz[i];
-
- for (int i=0; i<m_Nx; i++) for (int j=0; j<m_Ny; j++)
+ if (argc>=12)
  {
-  h[D3(m_Nx, m_Ny, i, j, 0)]=dz[D3(m_Nx, m_Ny, i, j, 0)];
-  for (int k=1; k<m_Nz; k++) h[D3(m_Nx, m_Ny, i, j, k)]=h[D3(m_Nx, m_Ny, i, j, k-1)]+dz[D3(m_Nx, m_Ny, i, j, k)]; //cumulative sum
+  dz=(double*)argv[10];
+  h=(double*)argv[11];
+ }
+ else
+ {
+  dz=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
+  h=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
 
-  for (int k=0; k<m_Nz; k++) h[D3(m_Nx, m_Ny, i, j, k)]-=dz[D3(m_Nx, m_Ny, i, j, k)]/2;
+  for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) dz[i]=(double)m_dz[i];
+
+  for (int i=0; i<m_Nx; i++) for (int j=0; j<m_Ny; j++)
+  {
+   h[D3(m_Nx, m_Ny, i, j, 0)]=dz[D3(m_Nx, m_Ny, i, j, 0)];
+   for (int k=1; k<m_Nz; k++) h[D3(m_Nx, m_Ny, i, j, k)]=h[D3(m_Nx, m_Ny, i, j, k-1)]+dz[D3(m_Nx, m_Ny, i, j, k)]; //cumulative sum
+
+   for (int k=0; k<m_Nz; k++) h[D3(m_Nx, m_Ny, i, j, k)]-=dz[D3(m_Nx, m_Ny, i, j, k)]/2;
+  }
  }
 
  double z1=-m_RSun;
@@ -536,8 +546,11 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
   free(QgridL);
   free(LgridL);
  }
- free(dz);
- free(h);
+ if (argc<12)
+ {
+  free(dz);
+  free(h);
+ }
  free(fluxTR);
  free(fluxCorona);
  free(wy);
@@ -558,6 +571,8 @@ extern "C" int ComputeEUV(int argc, void **argv)
  int m_Nz=*(m32++); 
  int m_chromo_layers=*(m32++);
 
+ float *m_dz=(float*)(m32+20);
+
  __int32 *b32=(__int32*)argv[3]; 
  int b_Nx=*(b32++); 
  int b_Ny=*(b32++); 
@@ -573,6 +588,19 @@ extern "C" int ComputeEUV(int argc, void **argv)
 
  void *SHtable=(argc>6) ? argv[6] : 0;
 
+ double *dz=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
+ double *h=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
+
+ for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) dz[i]=(double)m_dz[i];
+
+ for (int i=0; i<m_Nx; i++) for (int j=0; j<m_Ny; j++)
+ {
+  h[D3(m_Nx, m_Ny, i, j, 0)]=dz[D3(m_Nx, m_Ny, i, j, 0)];
+  for (int k=1; k<m_Nz; k++) h[D3(m_Nx, m_Ny, i, j, k)]=h[D3(m_Nx, m_Ny, i, j, k-1)]+dz[D3(m_Nx, m_Ny, i, j, k)]; //cumulative sum
+
+  for (int k=0; k<m_Nz; k++) h[D3(m_Nx, m_Ny, i, j, k)]-=dz[D3(m_Nx, m_Ny, i, j, k)]/2;
+ }
+
  #ifdef WINDOWS
  concurrency::critical_section cs;
 
@@ -584,7 +612,7 @@ extern "C" int ComputeEUV(int argc, void **argv)
  
  concurrency::parallel_for(0, NtMax, [&](int j)
  {
-  void *ARGV[10];
+  void *ARGV[12];
   memcpy(ARGV, argv, sizeof(void*)*6);
   ARGV[6]=SHtable;
 
@@ -593,6 +621,8 @@ extern "C" int ComputeEUV(int argc, void **argv)
 
   ARGV[8]=(void*)flags;
   ARGV[9]=(void*)&cs;
+  ARGV[10]=(void*)dz;
+  ARGV[11]=(void*)h;
 
   fragment[0]=0;
   fragment[1]=b_Nx-1;
@@ -610,7 +640,7 @@ extern "C" int ComputeEUV(int argc, void **argv)
  #pragma omp parallel for
  for (int j=0; j<b_Ny; j++)
  {
-  void *ARGV[10];
+  void *ARGV[12];
   memcpy(ARGV, argv, sizeof(void*)*6);
   ARGV[6]=SHtable;
 
@@ -618,12 +648,14 @@ extern "C" int ComputeEUV(int argc, void **argv)
   ARGV[7]=(void*)fragment;
 
   ARGV[8]=(void*)flags;
+  ARGV[10]=(void*)dz;
+  ARGV[11]=(void*)h;
 
   fragment[0]=0;
   fragment[1]=b_Nx-1;
   fragment[2]=fragment[3]=j;
 
-  ComputeEUV_fragment(10, ARGV);
+  ComputeEUV_fragment(12, ARGV);
  }
  #endif
 
@@ -636,6 +668,8 @@ extern "C" int ComputeEUV(int argc, void **argv)
   }
  }
 
+ free(h);
+ free(dz);
  free(flags);
 
  return 0;

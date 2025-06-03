@@ -177,17 +177,27 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  memset(I_L, 0, b_Nx*b_Ny*b_Nf*sizeof(double));
  memset(I_R, 0, b_Nx*b_Ny*b_Nf*sizeof(double));
 
- double *dz=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
- double *h=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
+ double *dz, *h;
 
- for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) dz[i]=(double)m_dz[i];
-
- for (int i=0; i<m_Nx; i++) for (int j=0; j<m_Ny; j++)
+ if (argc>=11)
  {
-  h[D3(m_Nx, m_Ny, i, j, 0)]=dz[D3(m_Nx, m_Ny, i, j, 0)];
-  for (int k=1; k<m_Nz; k++) h[D3(m_Nx, m_Ny, i, j, k)]=h[D3(m_Nx, m_Ny, i, j, k-1)]+dz[D3(m_Nx, m_Ny, i, j, k)]; //cumulative sum
+  dz=(double*)argv[9];
+  h=(double*)argv[10];
+ }
+ else
+ {
+  dz=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
+  h=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
 
-  for (int k=0; k<m_Nz; k++) h[D3(m_Nx, m_Ny, i, j, k)]-=dz[D3(m_Nx, m_Ny, i, j, k)]/2;
+  for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) dz[i]=(double)m_dz[i];
+
+  for (int i=0; i<m_Nx; i++) for (int j=0; j<m_Ny; j++)
+  {
+   h[D3(m_Nx, m_Ny, i, j, 0)]=dz[D3(m_Nx, m_Ny, i, j, 0)];
+   for (int k=1; k<m_Nz; k++) h[D3(m_Nx, m_Ny, i, j, k)]=h[D3(m_Nx, m_Ny, i, j, k-1)]+dz[D3(m_Nx, m_Ny, i, j, k)]; //cumulative sum
+
+   for (int k=0; k<m_Nz; k++) h[D3(m_Nx, m_Ny, i, j, k)]-=dz[D3(m_Nx, m_Ny, i, j, k)]/2;
+  }
  }
 
  double z1=-m_RSun;
@@ -534,8 +544,11 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  if (Tgrid) free(Tgrid);
  if (QgridL) free(QgridL);
  if (LgridL) free(LgridL);
- free(h);
- free(dz);
+ if (argc<11)
+ {
+  free(h);
+  free(dz);
+ }
  free(I_R);
  free(I_L);
  free(wy);
@@ -556,6 +569,8 @@ extern "C" int ComputeMW(int argc, void **argv)
  int m_Nz=*(m32++); 
  int m_chromo_layers=*(m32++);
 
+ float *m_dz=(float*)(m32+20);
+
  __int32 *b32=(__int32*)argv[2]; 
  int b_Nx=*(b32++); 
  int b_Ny=*(b32++); 
@@ -571,6 +586,19 @@ extern "C" int ComputeMW(int argc, void **argv)
 
  void *SHtable=(argc>5) ? argv[5] : 0;
 
+ double *dz=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
+ double *h=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
+
+ for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) dz[i]=(double)m_dz[i];
+
+ for (int i=0; i<m_Nx; i++) for (int j=0; j<m_Ny; j++)
+ {
+  h[D3(m_Nx, m_Ny, i, j, 0)]=dz[D3(m_Nx, m_Ny, i, j, 0)];
+  for (int k=1; k<m_Nz; k++) h[D3(m_Nx, m_Ny, i, j, k)]=h[D3(m_Nx, m_Ny, i, j, k-1)]+dz[D3(m_Nx, m_Ny, i, j, k)]; //cumulative sum
+
+  for (int k=0; k<m_Nz; k++) h[D3(m_Nx, m_Ny, i, j, k)]-=dz[D3(m_Nx, m_Ny, i, j, k)]/2;
+ }
+
  #ifdef WINDOWS
  concurrency::critical_section cs;
 
@@ -582,7 +610,7 @@ extern "C" int ComputeMW(int argc, void **argv)
  
  concurrency::parallel_for(0, NtMax, [&](int j)
  {
-  void *ARGV[9];
+  void *ARGV[11];
   memcpy(ARGV, argv, sizeof(void*)*5);
   ARGV[5]=SHtable;
 
@@ -591,6 +619,8 @@ extern "C" int ComputeMW(int argc, void **argv)
 
   ARGV[7]=(void*)flags;
   ARGV[8]=(void*)&cs;
+  ARGV[9]=(void*)dz;
+  ARGV[10]=(void*)h;
 
   fragment[0]=0;
   fragment[1]=b_Nx-1;
@@ -598,7 +628,7 @@ extern "C" int ComputeMW(int argc, void **argv)
   fragment[2]=(j<Nm) ? K*j : K*Nm+(K+1)*(j-Nm);
   fragment[3]=fragment[2]+((j<Nm) ? K : K+1)-1;
 
-  ComputeMW_fragment(9, ARGV);
+  ComputeMW_fragment(11, ARGV);
  });
  #else
  int NtMax=omp_get_max_threads();
@@ -608,7 +638,7 @@ extern "C" int ComputeMW(int argc, void **argv)
  #pragma omp parallel for
  for (int j=0; j<b_Ny; j++)
  {
-  void *ARGV[9];
+  void *ARGV[11];
   memcpy(ARGV, argv, sizeof(void*)*5);
   ARGV[5]=SHtable;
 
@@ -616,12 +646,14 @@ extern "C" int ComputeMW(int argc, void **argv)
   ARGV[6]=(void*)fragment;
 
   ARGV[7]=(void*)flags;
+  ARGV[9]=(void*)dz;
+  ARGV[10]=(void*)h;
 
   fragment[0]=0;
   fragment[1]=b_Nx-1;
   fragment[2]=fragment[3]=j;
 
-  ComputeMW_fragment(9, ARGV);
+  ComputeMW_fragment(11, ARGV);
  }
  #endif
 
@@ -634,6 +666,8 @@ extern "C" int ComputeMW(int argc, void **argv)
   }
  }
 
+ free(h);
+ free(dz);
  free(flags);
 
  return 0;
