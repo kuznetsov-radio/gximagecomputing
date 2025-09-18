@@ -1,4 +1,4 @@
-RenderGRFF		:	Coulomb.o DEM.o ExtMath.o FF.o GR.o MWtransfer.o Neutrals.o Plasma.o RenderIrregular.o Rmain.o Zeta.o EUVmain.o GXexports.o
+RenderGRFF		:	Coulomb.o DEM.o ExtMath.o FF.o GR.o MWtransfer.o Neutrals.o Plasma.o RenderIrregular.o Rmain.o Zeta.o EUVmain.o GXexports.o PyInterface.o
 				g++ $^ -shared -fopenmp -o RenderGRFF.so
 Coulomb.o		:	Coulomb.cpp Coulomb.h DEM.h ExtMath.h FF.h GR.h IDLinterface.h MWtransfer.h Neutrals.h Plasma.h RenderIrregular.h Zeta.h GXdefs.h
 				g++ -c -std=c++11 -O3 -fPIC -fopenmp -D LINUX Coulomb.cpp
@@ -26,3 +26,5 @@ Zeta.o			:	Zeta.cpp Coulomb.h DEM.h ExtMath.h FF.h GR.h IDLinterface.h MWtransfe
 				g++ -c -std=c++11 -O3 -fPIC -fopenmp -D LINUX Zeta.cpp
 GXexports.o		:	GXexports.cpp Coulomb.h DEM.h ExtMath.h FF.h GR.h IDLinterface.h MWtransfer.h Neutrals.h Plasma.h RenderIrregular.h Zeta.h GXdefs.h
 				g++ -c -std=c++11 -O3 -fopenmp -fPIC -D LINUX GXexports.cpp
+PyInterface.o		:	PyInterface.cpp Rmain.h EUVmain.h
+				g++ -c -std=c++11 -O3 -fopenmp -fPIC -D LINUX PyInterface.cpp

@@ -672,20 +672,3 @@ extern "C" int ComputeMW(int argc, void **argv)
 
  return 0;
 }
-
-#ifdef WINDOWS
-extern "C" __declspec(dllexport) int pyComputeMW(void *model, void *ebtel, void *simbox, void *cparms, void *out)
-#else
-extern "C" int pyComputeMW(void* model, void* ebtel, void* simbox, void* cparms, void* out)
-#endif
-{
- void *ARGV[5];
-
- ARGV[0]=model;
- ARGV[1]=ebtel;
- ARGV[2]=simbox;
- ARGV[3]=cparms;
- ARGV[4]=out;
-
- return ComputeMW(5, ARGV);
-}
