@@ -168,6 +168,7 @@
     <ClCompile Include="MWtransfer.cpp" />
     <ClCompile Include="Neutrals.cpp" />
     <ClCompile Include="Plasma.cpp" />
+    <ClCompile Include="PyInterface.cpp" />
     <ClCompile Include="RenderIrregular.cpp" />
     <ClCompile Include="Rmain.cpp" />
     <ClCompile Include="Zeta.cpp" />
@@ -175,6 +176,7 @@
   <ItemGroup>
     <ClInclude Include="Coulomb.h" />
     <ClInclude Include="DEM.h" />
+    <ClInclude Include="EUVmain.h" />
     <ClInclude Include="ExtMath.h" />
     <ClInclude Include="FF.h" />
     <ClInclude Include="GR.h" />
@@ -185,6 +187,7 @@
     <ClInclude Include="Neutrals.h" />
     <ClInclude Include="Plasma.h" />
     <ClInclude Include="RenderIrregular.h" />
+    <ClInclude Include="Rmain.h" />
     <ClInclude Include="Zeta.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
