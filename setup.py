@@ -15,12 +15,13 @@ compile_flags = {
 }
 
 link_flags = {
-    'Linux':   ["-shared", "-fopenmp", "-lm"],
-    'Windows': ["-shared", "-fopenmp", "-lm"],
-    'Darwin':             ["-fopenmp", "-lm"]
+    'Linux':   ["-fopenmp"],
+    'Windows': ["-fopenmp"],
+    'Darwin':  ["-fopenmp"]
 }
 
 current_os = platform.system()
+print("building for", current_os)
 
 if current_os in link_flags:
     extra_link    = link_flags[current_os]
