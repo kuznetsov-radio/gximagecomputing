@@ -4,11 +4,13 @@ import ctypes
 import numpy as np
 import scipy.io as io
 from astropy.coordinates import SkyCoord
-from sunpy.coordinates import frames
+from sunpy.coordinates import frames, sun
 import astropy.units as u
 from astropy.time import Time
 from pathlib import Path
 import os
+import pdb
+
 
 class GXRadioImageComputing:
     def __init__(self, libname=None):
@@ -194,7 +196,8 @@ class GXRadioImageComputing:
     
         DSun = model_data.box.index[0]["DSUN_OBS"][0]*1e2
         RSun = init_coords.rsun.to(u.cm).value
-        
+        b0Sun = sun.B0(aptime).value
+
         lonC=np.rad2deg(np.arctan2(xC, zC))
         latC=np.rad2deg(np.arcsin(yC/RSun))
     
@@ -211,7 +214,8 @@ class GXRadioImageComputing:
         Nx=s[2]
         Ny=s[1]
         Nz=s[0]
-    
+
+        VoxelID = np.zeros(s)
         chromo_layers=model_data.box.chromo_layers[0]
         corona_layers=Nz-chromo_layers
         corona_base=model_data.box.corona_base[0]
@@ -245,26 +249,51 @@ class GXRadioImageComputing:
         chromo_np.flat[chromo_idx] = model_data.box.n_p[0].flat
         chromo_nHI.flat[chromo_idx]= model_data.box.n_hi[0].flat
         chromo_T0.flat[chromo_idx] = model_data.box.chromo_t[0].flat
-    
+
+        if model_data.box.base is None or "CHROMO_MASK" not in model_data.box.base.dtype.names:
+            chromo_mask = np.zeros_like(model_data.box.idx[0])
+        else:
+            chromo_mask = model_data.box.base.chromo_mask
+
         if "BMED" in model_data.box.dtype.names:
             QB = np.zeros((Nx, Ny, sc[1]))
             QL = np.zeros((Nx, Ny, sc[1]))
+            ID1 = np.zeros((Nx, Ny, sc[1]))
+            ID2 = np.zeros((Nx, Ny, sc[1]))
+
             idx = np.unravel_index(model_data.box.idx[0], QB.shape, order="F")
-    
+
+            ID1[idx] = chromo_mask[model_data.box.foot1[0]]
+            ID2[idx] = chromo_mask[model_data.box.foot2[0]]
+
             QB[idx] = model_data.box.bmed[0]
             QL[idx] = model_data.box.length[0]*RSun
         elif "AVFIELD" in model_data.box.dtype.names:
             QB = model_data.box.avfield[0].T.copy()
             QL = model_data.box.physlength[0].T.copy()*RSun
             uu = model_data.box.status[0].T
+            startidx = model_data.box.startidx[0]
+            endidx   = model_data.box.endidx[0]
+
+            ID1 = chromo_mask[startidx]
+            ID2 = chromo_mask[endidx]
+
             QB[(uu & 4) != 4] = 0
             QL[(uu & 4) != 4] = 0
-    
+            ID1[(uu & 4) != 4] = 0
+            ID2[(uu & 4) != 4] = 0
+
         corona_Bavg         = QB[:, :, corona_base : sc[1]].T
         chromo_uniform_Bavg = QB[:, :, 0 : corona_base].T
-    
+
         corona_L         = QL[:, :, corona_base : sc[1]].T
         chromo_uniform_L = QL[:, :, 0 : corona_base].T
+
+        corona_ID1 = ID1[:, :, corona_base : sc[1]].T
+        corona_ID2 = ID2[:, :, corona_base : sc[1]].T
+
+        chromo_uniform_ID1 = ID1[:, :, 0 : corona_base].T
+        chromo_uniform_ID2 = ID2[:, :, 0 : corona_base].T
     
         model_dt_varlist = [
                 ('Nx', np.int32),
@@ -275,6 +304,7 @@ class GXRadioImageComputing:
                 ('corona_base',   np.int32),
                 ('DSun', np.float64),
                 ('RSun', np.float64),
+                ('b0Sun', np.float64),
                 ('lonC', np.float64),
                 ('latC', np.float64),
                 ('dx',   np.float64),
@@ -292,7 +322,13 @@ class GXRadioImageComputing:
                 ('corona_Bavg', np.float32, cor_s),
                 ('corona_L',    np.float32, cor_s),
                 ('chromo_uniform_Bavg', np.float32, cor_s2),
-                ('chromo_uniform_L',    np.float32, cor_s2)]
+                ('chromo_uniform_L',    np.float32, cor_s2),
+                ('VoxelID',            np.byte, s),
+                ('corona_ID1',         np.byte, cor_s),
+                ('corona_ID2',         np.byte, cor_s),
+                ('chromo_uniform_ID1', np.byte, cor_s2),
+                ('chromo_uniform_ID2', np.byte, cor_s2)
+        ]
         
         model_dt = np.dtype(model_dt_varlist)
         model = np.zeros(1, dtype=model_dt)
@@ -308,7 +344,7 @@ class GXRadioImageComputing:
     
         return model, model_dt
 
-    def synth_model(self, model, model_dt, ebtel, ebtel_dt, freqlist, box_Nx, box_Ny, box_xc, box_yc, box_dx, box_dy, Tbase, nbase, Q0, a, b, force_isothermal=1):
+    def synth_model(self, model, model_dt, ebtel, ebtel_dt, freqlist, box_Nx, box_Ny, box_xc, box_yc, box_dx, box_dy, Tbase, nbase, Q0, a, b, SHtable=None, force_isothermal=1):
         dt_s=np.dtype([('Nx', np.int32),
                        ('Ny', np.int32),
                        ('Nf', np.int32),
@@ -327,7 +363,7 @@ class GXRadioImageComputing:
         simbox['dx']=box_dx
         simbox['dy']=box_dy
         simbox['freqlist']=freqlist
-        
+
         dt_c=np.dtype([('Tbase', np.float64),
                        ('nbase', np.float64),
                        ('Q0', np.float64),
@@ -348,19 +384,25 @@ class GXRadioImageComputing:
                        ('TV', np.float64, (box_Nx, box_Ny, len(freqlist)))])
         outspace=np.zeros(1, dtype=dt_o)
 
-        _dt_s=np.ctypeslib.ndpointer(dtype=dt_s)
-        _dt_c=np.ctypeslib.ndpointer(dtype=dt_c)
-        _dt_o=np.ctypeslib.ndpointer(dtype=dt_o)
-        _dt_ebtel=np.ctypeslib.ndpointer(dtype=ebtel_dt)
-        _dt_model=np.ctypeslib.ndpointer(dtype=model_dt)
+        if SHtable is None:
+            SHtable = np.ones((7, 7), dtype=np.float64)
+        dt_sh = np.dtype([("SHtable", np.float64, (7, 7))])
+        shtable = np.zeros(1, dtype=dt_sh)
+        shtable['SHtable'] = SHtable
 
-        self.mwfunc.argtypes=[_dt_model, _dt_ebtel, _dt_s, _dt_c, _dt_o]
+        _dt_model = np.ctypeslib.ndpointer(dtype=model_dt)
+        _dt_ebtel = np.ctypeslib.ndpointer(dtype=ebtel_dt)
+        _dt_s  = np.ctypeslib.ndpointer(dtype=dt_s)
+        _dt_c  = np.ctypeslib.ndpointer(dtype=dt_c)
+        _dt_o  = np.ctypeslib.ndpointer(dtype=dt_o)
+        _dt_sh = np.ctypeslib.ndpointer(dtype=dt_sh)
 
-        r=self.mwfunc(model, ebtel, simbox, cparms, outspace)
+        self.mwfunc.argtypes=[_dt_model, _dt_ebtel, _dt_s, _dt_c, _dt_o, _dt_sh]
+        r=self.mwfunc(model, ebtel, simbox, cparms, outspace, shtable)
 
         o=outspace[0]
-        TI=np.reshape(np.ravel(o['TI']), (box_Nx, box_Ny, len(freqlist)), order='F')
-        TV=np.reshape(np.ravel(o['TV']), (box_Nx, box_Ny, len(freqlist)), order='F')
+        TI=np.reshape(np.ravel(o['TI']), (box_Nx, box_Ny, len(freqlist)), order='F').swapaxes(0, 1)
+        TV=np.reshape(np.ravel(o['TV']), (box_Nx, box_Ny, len(freqlist)), order='F').swapaxes(0, 1)
     
         return {"TI": TI, "TV": TV}
     

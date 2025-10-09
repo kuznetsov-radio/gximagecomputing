@@ -1,8 +1,9 @@
 #pragma once
 
+#include <cmath> // required everywhere
+
 #ifndef WINDOWS
 #define finite isfinite
-#include <cmath>
 #else
 #define finite _finite
 #endif
