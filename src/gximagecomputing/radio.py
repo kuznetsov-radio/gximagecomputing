@@ -22,6 +22,9 @@ class GXRadioImageComputing:
         self.mwfunc=libc_mw.pyComputeMW
         self.mwfunc.restype=ctypes.c_int
 
+        self.mwfuncsh=libc_mw.pyComputeMW_SH
+        self.mwfuncsh.restype=ctypes.c_int
+
     def load_ebtel(self, ebtel_file):
         ebtel_data = io.readsav(ebtel_file)
         s = ebtel_data["lrun"].shape
@@ -384,21 +387,25 @@ class GXRadioImageComputing:
                        ('TV', np.float64, (box_Nx, box_Ny, len(freqlist)))])
         outspace=np.zeros(1, dtype=dt_o)
 
-        if SHtable is None:
-            SHtable = np.ones((7, 7), dtype=np.float64)
-        dt_sh = np.dtype([("SHtable", np.float64, (7, 7))])
-        shtable = np.zeros(1, dtype=dt_sh)
-        shtable['SHtable'] = SHtable
-
         _dt_model = np.ctypeslib.ndpointer(dtype=model_dt)
         _dt_ebtel = np.ctypeslib.ndpointer(dtype=ebtel_dt)
         _dt_s  = np.ctypeslib.ndpointer(dtype=dt_s)
         _dt_c  = np.ctypeslib.ndpointer(dtype=dt_c)
         _dt_o  = np.ctypeslib.ndpointer(dtype=dt_o)
-        _dt_sh = np.ctypeslib.ndpointer(dtype=dt_sh)
 
-        self.mwfunc.argtypes=[_dt_model, _dt_ebtel, _dt_s, _dt_c, _dt_o, _dt_sh]
-        r=self.mwfunc(model, ebtel, simbox, cparms, outspace, shtable)
+        if SHtable is None:
+            #SHtable = np.ones((7, 7), dtype=np.float64)
+            func = self.mwfunc
+            func.argtypes=[_dt_model, _dt_ebtel, _dt_s, _dt_c, _dt_o]
+            r=func(model, ebtel, simbox, cparms, outspace)
+        else:
+            func = self.mwfuncsh
+            dt_sh = np.dtype([("SHtable", np.float64, (7, 7))])
+            shtable = np.zeros(1, dtype=dt_sh)
+            shtable['SHtable'] = SHtable
+            _dt_sh = np.ctypeslib.ndpointer(dtype=dt_sh)
+            func.argtypes=[_dt_model, _dt_ebtel, _dt_s, _dt_c, _dt_o, _dt_sh]
+            r=func(model, ebtel, simbox, cparms, outspace, shtable)
 
         o=outspace[0]
         TI=np.reshape(np.ravel(o['TI']), (box_Nx, box_Ny, len(freqlist)), order='F').swapaxes(0, 1)
