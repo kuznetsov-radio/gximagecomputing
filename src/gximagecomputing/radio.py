@@ -347,24 +347,37 @@ class GXRadioImageComputing:
     
         return model, model_dt
 
-    def synth_model(self, model, model_dt, ebtel, ebtel_dt, freqlist, box_Nx, box_Ny, box_xc, box_yc, box_dx, box_dy, Tbase, nbase, Q0, a, b, SHtable=None, force_isothermal=1):
+    def synth_model(self, model, model_dt, ebtel, ebtel_dt, freqlist, box_Nx, box_Ny, box_xc, box_yc, box_dx, box_dy, Tbase, nbase, Q0, a, b, SHtable=None, rot=0, projection=0, mode=1):
+        """
+            mode: 1 - force_isothermal
+                  2 - interpolB
+                  3 - analyticalNT
+
+            projection:
+                  1 - parallel
+                  2 - exact
+        """
+
         dt_s=np.dtype([('Nx', np.int32),
                        ('Ny', np.int32),
                        ('Nf', np.int32),
-                       ('_r1', np.int32),
+                       ('projection', np.int32),
                        ('xc', np.float64),
                        ('yc', np.float64),
                        ('dx', np.float64),
                        ('dy', np.float64),
+                       ('rot', np.float64),
                        ('freqlist', np.float64, len(freqlist))])
         simbox=np.zeros(1, dtype=dt_s)
         simbox['Nx']=box_Nx
         simbox['Ny']=box_Ny
         simbox['Nf']=len(freqlist)
+        simbox['projection']=projection
         simbox['xc']=box_xc
         simbox['yc']=box_yc
         simbox['dx']=box_dx
         simbox['dy']=box_dy
+        simbox['rot']=rot
         simbox['freqlist']=freqlist
 
         dt_c=np.dtype([('Tbase', np.float64),
@@ -372,14 +385,14 @@ class GXRadioImageComputing:
                        ('Q0', np.float64),
                        ('a', np.float64),
                        ('b', np.float64),
-                       ('iso', np.int32)])
+                       ('mode', np.int32)])
         cparms=np.zeros(1, dtype=dt_c)
         cparms['Tbase']=Tbase
         cparms['nbase']=nbase
         cparms['Q0']=Q0
         cparms['a']=a
         cparms['b']=b
-        cparms['iso']=force_isothermal
+        cparms['mode']=mode
 
         dt_o=np.dtype([('flagsAll', np.int32, 6),
                        ('flagsCorona', np.int32, 6),
