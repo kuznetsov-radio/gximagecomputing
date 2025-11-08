@@ -82,7 +82,7 @@ class GXRadioImageComputing:
         latC=np.rad2deg(np.arcsin(yC/RSun))
     
         dr = model_dict["dr"]
-    
+
         dx=dr[0]*RSun
         dy=dr[1]*RSun
         dz_uniform=dr[2]*RSun
@@ -186,24 +186,20 @@ class GXRadioImageComputing:
         model_data = io.readsav(file_name)
         lon = model_data.box.index[0].CRVAL1[0]
         lat = model_data.box.index[0].CRVAL2[0]
-    
+
         init_coords = SkyCoord(lon*u.deg, lat*u.deg, frame=frames.HeliographicCarrington,rsun=696000*u.km,\
                            obstime=Time(model_data.box.index[0]["DATE_OBS"][0]), observer="earth")
-        hcc = init_coords.transform_to(frames.Heliocentric)
+
+        hgs = init_coords.transform_to(frames.HeliographicStonyhurst)
         aptime = Time(model_data.box.index[0]["DATE_OBS"][0])
         obstime = aptime.unix - 283996800 # according to IDL specs, anytim function
-    
-        x, y, z = hcc.cartesian.x, hcc.cartesian.y, hcc.cartesian.z
-        xC, yC, zC = (c.to(u.cm).value for c in (x, y, z))
-        # Warning: the values xC, yC, zC slightly differ, because sunpy Heliocentric system is different from IDL
-    
+
         DSun = model_data.box.index[0]["DSUN_OBS"][0]*1e2
         RSun = init_coords.rsun.to(u.cm).value
         b0Sun = sun.B0(aptime).value
 
-        lonC=np.rad2deg(np.arctan2(xC, zC))
-        latC=np.rad2deg(np.arcsin(yC/RSun))
-    
+        lonC=hgs.lon.to(u.deg).value
+        latC=lat
         dr = model_data.box.dr[0]
     
         dx=dr[0]*RSun
@@ -213,7 +209,7 @@ class GXRadioImageComputing:
     
         s = dz.shape
         sc = model_data.box.bcube[0].shape
-        
+
         Nx=s[2]
         Ny=s[1]
         Nz=s[0]
@@ -222,14 +218,14 @@ class GXRadioImageComputing:
         chromo_layers=model_data.box.chromo_layers[0]
         corona_layers=Nz-chromo_layers
         corona_base=model_data.box.corona_base[0]
-    
+
         Bx=np.zeros(s, dtype=np.float32, order="C")
         By=np.zeros(s, dtype=np.float32, order="C")
         Bz=np.zeros(s, dtype=np.float32, order="C")
-    
+
         chromo_bcube = model_data.box.chromo_bcube[0]
         bcube = model_data.box.bcube[0]
-    
+
         Bx[0:chromo_layers, :, :]=chromo_bcube[0, :, :, :]
         By[0:chromo_layers, :, :]=chromo_bcube[1, :, :, :]
         Bz[0:chromo_layers, :, :]=chromo_bcube[2, :, :, :]
@@ -237,11 +233,11 @@ class GXRadioImageComputing:
         Bx[chromo_layers : Nz, :, :]=bcube[0, corona_base : Nz, :, :]
         By[chromo_layers : Nz, :, :]=bcube[1, corona_base : Nz, :, :]
         Bz[chromo_layers : Nz, :, :]=bcube[2, corona_base : Nz, :, :]
-    
+
         chr_s  = (chromo_layers,  Ny, Nx)
         cor_s  = (sc[1]-corona_base, Ny, Nx)
         cor_s2 = (corona_base,    Ny, Nx)
-    
+
         chromo_n0 =np.zeros(chr_s)
         chromo_np =np.zeros(chr_s)
         chromo_nHI=np.zeros(chr_s)
@@ -253,10 +249,7 @@ class GXRadioImageComputing:
         chromo_nHI.flat[chromo_idx]= model_data.box.n_hi[0].flat
         chromo_T0.flat[chromo_idx] = model_data.box.chromo_t[0].flat
 
-        if model_data.box.base is None or "CHROMO_MASK" not in model_data.box.base.dtype.names:
-            chromo_mask = np.zeros_like(model_data.box.idx[0])
-        else:
-            chromo_mask = model_data.box.base.chromo_mask
+        chromo_mask = model_data.box["base"][0]["chromo_mask"][0]
 
         if "BMED" in model_data.box.dtype.names:
             QB = np.zeros((Nx, Ny, sc[1]))
@@ -266,8 +259,8 @@ class GXRadioImageComputing:
 
             idx = np.unravel_index(model_data.box.idx[0], QB.shape, order="F")
 
-            ID1[idx] = chromo_mask[model_data.box.foot1[0]]
-            ID2[idx] = chromo_mask[model_data.box.foot2[0]]
+            ID1[idx] = chromo_mask.flat[model_data.box.foot1[0]]
+            ID2[idx] = chromo_mask.flat[model_data.box.foot2[0]]
 
             QB[idx] = model_data.box.bmed[0]
             QL[idx] = model_data.box.length[0]*RSun
