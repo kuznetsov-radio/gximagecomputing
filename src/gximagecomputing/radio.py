@@ -3,6 +3,7 @@
 import ctypes
 import numpy as np
 import scipy.io as io
+import h5py
 from astropy.coordinates import SkyCoord
 from sunpy.coordinates import frames, sun
 import astropy.units as u
@@ -68,19 +69,15 @@ class GXRadioImageComputing:
         lon, lat, dsun_obs, obs_time = [header.get(k) for k in ("lon", "lat", "dsun_obs", "obs_time")]
         init_coords = SkyCoord(lon*u.deg, lat*u.deg, frame=frames.HeliographicCarrington,rsun=696000*u.km,\
                        obstime=obs_time, observer="earth")
-        hcc = init_coords.transform_to(frames.Heliocentric)
+        hgs = init_coords.transform_to(frames.HeliographicStonyhurst)
         obstime = obs_time.unix - 283996800 # according to IDL specs, anytim function
-
-        x, y, z = hcc.cartesian.x, hcc.cartesian.y, hcc.cartesian.z
-        xC, yC, zC = (c.to(u.cm).value for c in (x, y, z))
-        # Warning: the values xC, yC, zC slightly differ, because sunpy Heliocentric system is different from IDL
 
         DSun = dsun_obs*1e2
         RSun = init_coords.rsun.to(u.cm).value
-        
-        lonC=np.rad2deg(np.arctan2(xC, zC))
-        latC=np.rad2deg(np.arcsin(yC/RSun))
-    
+        b0Sun = sun.B0(obs_time).value
+
+        lonC=hgs.lon.to(u.deg).value
+        latC=lat
         dr = model_dict["dr"]
 
         dx=dr[0]*RSun
@@ -129,17 +126,35 @@ class GXRadioImageComputing:
         chromo_nHI.flat[chromo_idx]= model_dict["n_hi"]
         chromo_T0.flat[chromo_idx] = model_dict["chromo_t"]
 
-        QB = model_dict["avfield"].copy()
-        QL = model_dict["physlength"].copy()*RSun
-        uu = model_dict["status"]
-        QB[(uu & 4) != 4] = 0
-        QL[(uu & 4) != 4] = 0
+        chromo_mask = model_dict["chromo_mask"].copy()
+
+        QB = np.zeros((Nx, Ny, sc[1]))
+        QL = np.zeros((Nx, Ny, sc[1]))
+        ID1 = np.zeros((Nx, Ny, sc[1]))
+        ID2 = np.zeros((Nx, Ny, sc[1]))
+
+        VoxelID = np.zeros(s)
+        idx = np.unravel_index(model_dict["apex_idx"], QB.shape, order="F")       
+        sidx = np.unravel_index(model_dict["startidx"], ID1.shape, order="F")
+        eidx = np.unravel_index(model_dict["endidx"],   ID2.shape, order="F")
+
+        QB[idx] = model_dict["avfield"].flat
+        QL[idx] = model_dict["physlength"].flat*RSun
+
+        ID1[sidx] = chromo_mask[sidx[0:2]]
+        ID2[eidx] = chromo_mask[eidx[0:2]]
 
         corona_Bavg         = QB[:, :, corona_base : sc[1]].T
         chromo_uniform_Bavg = QB[:, :, 0 : corona_base].T
 
         corona_L         = QL[:, :, corona_base : sc[1]].T
         chromo_uniform_L = QL[:, :, 0 : corona_base].T
+
+        corona_ID1 = ID1[:, :, corona_base : sc[1]].T
+        corona_ID2 = ID2[:, :, corona_base : sc[1]].T
+
+        chromo_uniform_ID1 = ID1[:, :, 0 : corona_base].T
+        chromo_uniform_ID2 = ID2[:, :, 0 : corona_base].T
 
         model_dt_varlist = [
                 ('Nx', np.int32),
@@ -150,6 +165,7 @@ class GXRadioImageComputing:
                 ('corona_base',   np.int32),
                 ('DSun', np.float64),
                 ('RSun', np.float64),
+                ('b0Sun', np.float64),
                 ('lonC', np.float64),
                 ('latC', np.float64),
                 ('dx',   np.float64),
@@ -167,7 +183,13 @@ class GXRadioImageComputing:
                 ('corona_Bavg', np.float32, cor_s),
                 ('corona_L',    np.float32, cor_s),
                 ('chromo_uniform_Bavg', np.float32, cor_s2),
-                ('chromo_uniform_L',    np.float32, cor_s2)]
+                ('chromo_uniform_L',    np.float32, cor_s2),
+                ('VoxelID',            np.byte, s),
+                ('corona_ID1',         np.byte, cor_s),
+                ('corona_ID2',         np.byte, cor_s),
+                ('chromo_uniform_ID1', np.byte, cor_s2),
+                ('chromo_uniform_ID2', np.byte, cor_s2)
+        ]
 
         model_dt = np.dtype(model_dt_varlist)
         model = np.zeros(1, dtype=model_dt)
@@ -182,16 +204,33 @@ class GXRadioImageComputing:
     
         return model, model_dt
 
+    def load_model_hdf(self, file_name):
+        # for loading HDF5 files produced by pyAMPP
+
+        model_f = h5py.File(file_name, "r")
+        chromo_box = model_f["chromo"]
+        header = dict(chromo_box.attrs)
+
+        chromo_box_loaded = {}
+        for k in chromo_box.keys():
+            try:
+                chromo_box_loaded[k] = chromo_box[k][:]
+            except ValueError:
+                chromo_box_loaded[k] = chromo_box[k][()]
+        model_f.close()
+        header["obs_time"] = Time(header["obs_time"])
+        return self.load_model_dict(chromo_box_loaded, header)
+    
     def load_model_sav(self, file_name):
         model_data = io.readsav(file_name)
         lon = model_data.box.index[0].CRVAL1[0]
         lat = model_data.box.index[0].CRVAL2[0]
+        aptime = Time(model_data.box.index[0]["DATE_OBS"][0])
 
         init_coords = SkyCoord(lon*u.deg, lat*u.deg, frame=frames.HeliographicCarrington,rsun=696000*u.km,\
-                           obstime=Time(model_data.box.index[0]["DATE_OBS"][0]), observer="earth")
+                           obstime=aptime, observer="earth")
 
         hgs = init_coords.transform_to(frames.HeliographicStonyhurst)
-        aptime = Time(model_data.box.index[0]["DATE_OBS"][0])
         obstime = aptime.unix - 283996800 # according to IDL specs, anytim function
 
         DSun = model_data.box.index[0]["DSUN_OBS"][0]*1e2
