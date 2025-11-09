@@ -134,15 +134,20 @@ class GXRadioImageComputing:
         ID2 = np.zeros((Nx, Ny, sc[1]))
 
         VoxelID = np.zeros(s)
-        idx = np.unravel_index(model_dict["apex_idx"], QB.shape, order="F")       
-        sidx = np.unravel_index(model_dict["startidx"], ID1.shape, order="F")
-        eidx = np.unravel_index(model_dict["endidx"],   ID2.shape, order="F")
+        idx = np.unravel_index(model_dict["seed_idx"], QB.shape, order="F")
+        sidx = np.unravel_index(model_dict["start_idx"], ID1.shape, order="F")
+        eidx = np.unravel_index(model_dict["end_idx"],   ID2.shape, order="F")
 
-        QB[idx] = model_dict["avfield"].flat
-        QL[idx] = model_dict["physlength"].flat*RSun
-
+        QB[idx] = model_dict["av_field"].flat
+        QL[idx] = model_dict["phys_length"].flat*RSun
         ID1[sidx] = chromo_mask[sidx[0:2]]
         ID2[eidx] = chromo_mask[eidx[0:2]]
+
+        uu = model_dict["voxel_status"]
+        QB.flat[(uu & 4) != 4] = 0
+        QL.flat[(uu & 4) != 4] = 0
+        ID1.flat[(uu & 4) != 4] = 0
+        ID2.flat[(uu & 4) != 4] = 0
 
         corona_Bavg         = QB[:, :, corona_base : sc[1]].T
         chromo_uniform_Bavg = QB[:, :, 0 : corona_base].T
