@@ -1,6 +1,6 @@
 # gximagecomputing
 
-This code computes 2D maps of the solar microwave (gyroresonance and free-free) and EUV (spectral lines) emission, using models of active regions created by the **GX Simulator** (requires SolarSoft GX_Simulator package).
+This code computes 2D maps of the solar microwave (gyroresonance and free-free) and EUV (spectral lines) emission, using models of active regions created by the [**GX Simulator**](https://github.com/Gelu-Nita/GX_SIMULATOR/) (requires SolarSoft GX_Simulator package).
 
 ----
 
@@ -8,9 +8,9 @@ This code computes 2D maps of the solar microwave (gyroresonance and free-free) 
 
 See the example files:
 
-- `examples/RenderExampleMW.pro`
-- `examples/RenderExampleEUV.pro`
-- `examples/RenderExample.py`
+- `./examples/RenderExampleMW.pro`
+- `./examples/RenderExampleEUV.pro`
+- `./examples/RenderExample.py`
 
 **Note:** Sample GX Simulator model and EBTEL data are not included.
 
@@ -142,6 +142,7 @@ ebtel = LoadEBTEL(ebtelfile)
 - If `ebtelfile=''`: DEM and heating model **not used**.
 
 The keyword `/DDM` should not be used, because the EUV emission depends on the DEM only.
+
 ---
 
 ### Step 3: Load Instrumental Response Function
@@ -256,7 +257,7 @@ Similar to `flagsAll`, but refers only to the *coronal* part of the model.
 ## References
 
 For detailed theory and formulae, see the relevant publications, especially:
-- Fleishman, Kuznetsov & Landi (2021)
+- [Fleishman, Kuznetsov & Landi (2021)](https://ui.adsabs.harvard.edu/abs/2021ApJ...914...52F/abstract)
 
 For questions or issues, please open a GitHub issue or contact the author.
 
