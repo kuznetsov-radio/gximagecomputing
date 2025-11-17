@@ -161,8 +161,8 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 
  double srot=sin(b_rot/180*M_PI);
  double crot=cos(b_rot/180*M_PI);
- double *wx=(double*)malloc(b_Nx*b_Ny*sizeof(double));
- double *wy=(double*)malloc(b_Nx*b_Ny*sizeof(double));
+ double *wx=(double*)malloc(sizeof(double)*b_Nx*b_Ny);
+ double *wy=(double*)malloc(sizeof(double)*b_Nx*b_Ny);
 
  for (int i=0; i<b_Nx; i++) for (int j=0; j<b_Ny; j++)
  {
@@ -172,10 +172,10 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
   wy[D2(b_Nx, i, j)]=b_yc+x1*srot+y1*crot;
  }
 
- double *I_L=(double*)malloc(b_Nx*b_Ny*b_Nf*sizeof(double));
- double *I_R=(double*)malloc(b_Nx*b_Ny*b_Nf*sizeof(double));
- memset(I_L, 0, b_Nx*b_Ny*b_Nf*sizeof(double));
- memset(I_R, 0, b_Nx*b_Ny*b_Nf*sizeof(double));
+ double *I_L=(double*)malloc(sizeof(double)*b_Nx*b_Ny*b_Nf);
+ double *I_R=(double*)malloc(sizeof(double)*b_Nx*b_Ny*b_Nf);
+ memset(I_L, 0, sizeof(double)*b_Nx*b_Ny*b_Nf);
+ memset(I_R, 0, sizeof(double)*b_Nx*b_Ny*b_Nf);
 
  double *dz, *h;
 
@@ -186,8 +186,8 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  }
  else
  {
-  dz=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
-  h=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
+  dz=(double*)malloc(sizeof(double)*m_Nx*m_Ny*m_Nz);
+  h=(double*)malloc(sizeof(double)*m_Nx*m_Ny*m_Nz);
 
   for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) dz[i]=(double)m_dz[i];
 
@@ -219,7 +219,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
   LgridL=(double*)malloc(e_NL*sizeof(double));
   for (int j=0; j<e_NL; j++) LgridL[j]=log((double)e_Lrun[D2(e_NQ, 0, j)]);
 
-  QgridL=(double*)malloc(e_NQ*e_NL*sizeof(double));
+  QgridL=(double*)malloc(sizeof(double)*e_NQ*e_NL);
   for (int i=0; i<e_NQ*e_NL; i++) QgridL[i]=log((double)e_Qrun[i]);
 
   Tgrid=(double*)malloc(e_NT*sizeof(double));
@@ -228,20 +228,22 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 
  double H_corona=corona_Hscale*cp_Tbase;
 
- char *flags=(char*)malloc(m_Nx*m_Ny*m_Nz*sizeof(char));
- memset(flags, 0, m_Nx*m_Ny*m_Nz*sizeof(char));
+ char *flags=(char*)malloc(sizeof(char)*m_Nx*m_Ny*m_Nz);
+ memset(flags, 0, sizeof(char)*m_Nx*m_Ny*m_Nz);
 
  int Nvoxels=0;
+ int arrN=300;
  int *VoxList=(int*)malloc(arrN*sizeof(int));
  double *ds=(double*)malloc(arrN*sizeof(double));
  double *xmid=(double*)malloc(arrN*sizeof(double));
  double *ymid=(double*)malloc(arrN*sizeof(double));
  double *zmid=(double*)malloc(arrN*sizeof(double));
 
- int Rdim[3];
+ int Rdim[4];
  Rdim[0]=m_Nx;
  Rdim[1]=m_Ny;
  Rdim[2]=m_Nz;
+ Rdim[3]=arrN;
 
  double Rdxdy[2];
  Rdxdy[0]=m_dx;
@@ -256,8 +258,8 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 
  int NvoxMax=300;
  double *Parms=(double*)malloc(InSize*NvoxMax*sizeof(double));
- double *DEM_arr=(DEM_on) ? (double*)malloc(e_NT*NvoxMax*sizeof(double)) : 0;
- double *DDM_arr=(DDM_on) ? (double*)malloc(e_NT*NvoxMax*sizeof(double)) : 0;
+ double *DEM_arr=(DEM_on) ? (double*)malloc(sizeof(double)*e_NT*NvoxMax) : 0;
+ double *DDM_arr=(DDM_on) ? (double*)malloc(sizeof(double)*e_NT*NvoxMax) : 0;
 
  double *RL=(double*)malloc(OutSize*b_Nf*sizeof(double));
  
@@ -331,7 +333,29 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
   ARGV[9]=(void*)ymid;
   ARGV[10]=(void*)zmid;
 
-  int res=RENDER(11, ARGV);
+  int res=1;
+  while (res!=0)
+  {
+   res=RENDER(11, ARGV);
+
+   if (res!=0)
+   {
+	arrN+=100;
+	Rdim[3]=arrN;
+
+	VoxList=(int*)realloc(VoxList, arrN*sizeof(int));
+    ds=(double*)realloc(ds, arrN*sizeof(double));
+    xmid=(double*)realloc(xmid, arrN*sizeof(double));
+    ymid=(double*)realloc(ymid, arrN*sizeof(double));
+    zmid=(double*)realloc(zmid, arrN*sizeof(double));
+
+	ARGV[6]=(void*)VoxList;
+    ARGV[7]=(void*)ds;
+    ARGV[8]=(void*)xmid;
+    ARGV[9]=(void*)ymid;
+    ARGV[10]=(void*)zmid;
+   }
+  }
 
   if (Nvoxels>0)
   {
@@ -341,8 +365,8 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
    {
 	NvoxMax=Nvoxels+100;
 	Parms=(double*)realloc(Parms, InSize*NvoxMax*sizeof(double));
-	if (DEM_on) DEM_arr=(double*)realloc(DEM_arr, e_NT*NvoxMax*sizeof(double));
-	if (DDM_on) DDM_arr=(double*)realloc(DDM_arr, e_NT*NvoxMax*sizeof(double));
+	if (DEM_on) DEM_arr=(double*)realloc(DEM_arr, sizeof(double)*e_NT*NvoxMax);
+	if (DDM_on) DDM_arr=(double*)realloc(DDM_arr, sizeof(double)*e_NT*NvoxMax);
    }
 
    memset(Parms, 0, InSize*Nvoxels*sizeof(double));
@@ -581,13 +605,13 @@ extern "C" int ComputeMW(int argc, void **argv)
  __int32 *o_flagsAll=(__int32*)argv[4];
  __int32 *o_flagsCorona=o_flagsAll+6;
 
- char *flags=(char*)malloc(m_Nx*m_Ny*m_Nz*sizeof(char));
- memset(flags, 0, m_Nx*m_Ny*m_Nz*sizeof(char));
+ char *flags=(char*)malloc(sizeof(char)*m_Nx*m_Ny*m_Nz);
+ memset(flags, 0, sizeof(char)*m_Nx*m_Ny*m_Nz);
 
  void *SHtable=(argc>5) ? argv[5] : 0;
 
- double *dz=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
- double *h=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
+ double *dz=(double*)malloc(sizeof(double)*m_Nx*m_Ny*m_Nz);
+ double *h=(double*)malloc(sizeof(double)*m_Nx*m_Ny*m_Nz);
 
  for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) dz[i]=(double)m_dz[i];
 

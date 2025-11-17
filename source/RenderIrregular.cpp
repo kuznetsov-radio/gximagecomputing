@@ -43,6 +43,7 @@ extern "C" int RENDER(int argc, void **argv)
  int Nx=Lparms[0];
  int Ny=Lparms[1];
  int Nz=Lparms[2];
+ int arrN=Lparms[3];
 
  double *dxdy=(double*)argv[1];
  double dx=dxdy[0];
