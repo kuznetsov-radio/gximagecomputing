@@ -1,9 +1,9 @@
 /* Computation of the thermally averaged Gaunt factor and the corresponding Coulomb logarithm (for a hydrogen-like atom),
    according to the method and data presented in the paper of van Hoof et al. (MNRAS, 444, 420, 2014). */
 
+#include "ExtMath.h"
 #include <math.h>
 #include "Plasma.h"
-#include "ExtMath.h"
 
 #define N_u 146     //number of grid points in u direction
 #define N_g2 81     //number of grid points in gam2 direction

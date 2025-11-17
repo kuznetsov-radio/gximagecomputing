@@ -1,9 +1,9 @@
 #pragma once
 
 #ifndef WINDOWS
-#define finite isfinite
 #include <cmath>
 #else
+#define _USE_MATH_DEFINES
 #define finite _finite
 #endif
 

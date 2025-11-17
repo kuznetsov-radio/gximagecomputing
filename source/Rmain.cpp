@@ -1,9 +1,9 @@
+#include "ExtMath.h"
 #include <stdlib.h>
 #include <math.h>
 #include <memory.h>
 #include "IDLinterface.h"
 #include "Plasma.h"
-#include "ExtMath.h"
 #include "RenderIrregular.h"
 #include "MWtransfer.h"
 #include "GXdefs.h"

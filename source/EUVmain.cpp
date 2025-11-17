@@ -1,8 +1,8 @@
+#include "ExtMath.h"
 #include <stdlib.h>
 #include <math.h>
 #include <memory.h>
 #include "IDLinterface.h"
-#include "ExtMath.h"
 #include "RenderIrregular.h"
 #include "Plasma.h"
 #include "GXdefs.h"

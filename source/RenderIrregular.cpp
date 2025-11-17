@@ -1,8 +1,8 @@
+#include "ExtMath.h"
 #include <stdlib.h>
 #include <math.h>
 #include <float.h>
 #include "RenderIrregular.h"
-#include "ExtMath.h"
 
 int CheckCrossPixel(double xl, double xr, double yb, double yt, double x1, double x2, double y1, double y2)
 {
