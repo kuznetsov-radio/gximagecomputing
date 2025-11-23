@@ -78,6 +78,7 @@ class GXRadioImageComputing:
 
         lonC=hgs.lon.to(u.deg).value
         latC=lat
+
         dr = model_dict["dr"]
 
         dx=dr[0]*RSun
@@ -119,7 +120,7 @@ class GXRadioImageComputing:
         chromo_np =np.zeros(chr_s)
         chromo_nHI=np.zeros(chr_s)
         chromo_T0 =np.zeros(chr_s)
-    
+
         chromo_idx = model_dict["chromo_idx"]
         chromo_n0.flat[chromo_idx] = model_dict["chromo_n"]
         chromo_np.flat[chromo_idx] = model_dict["n_p"]
@@ -128,26 +129,28 @@ class GXRadioImageComputing:
 
         chromo_mask = model_dict["chromo_mask"].copy()
 
-        QB = np.zeros((Nx, Ny, sc[1]))
-        QL = np.zeros((Nx, Ny, sc[1]))
-        ID1 = np.zeros((Nx, Ny, sc[1]))
-        ID2 = np.zeros((Nx, Ny, sc[1]))
-
         VoxelID = np.zeros(s)
-        idx = np.unravel_index(model_dict["seed_idx"], QB.shape, order="F")
-        sidx = np.unravel_index(model_dict["start_idx"], ID1.shape, order="F")
-        eidx = np.unravel_index(model_dict["end_idx"],   ID2.shape, order="F")
+        startidx = model_dict["start_idx"]
+        endidx   = model_dict["end_idx"]
+        startidx[startidx >= np.prod(chromo_mask.shape)] = 0
+        endidx[endidx     >= np.prod(chromo_mask.shape)] = 0
 
-        QB[idx] = model_dict["av_field"].flat
-        QL[idx] = model_dict["phys_length"].flat*RSun
-        ID1[sidx] = chromo_mask[sidx[0:2]]
-        ID2[eidx] = chromo_mask[eidx[0:2]]
+        ID1 = chromo_mask.T.flat[startidx]
+        ID2 = chromo_mask.T.flat[endidx]
 
+        QB = model_dict["av_field"]
+        QL = model_dict["phys_length"]*RSun
         uu = model_dict["voxel_status"]
-        QB.flat[(uu & 4) != 4] = 0
-        QL.flat[(uu & 4) != 4] = 0
-        ID1.flat[(uu & 4) != 4] = 0
-        ID2.flat[(uu & 4) != 4] = 0
+
+        QB[ (uu & 4) != 4] = 0
+        QL[ (uu & 4) != 4] = 0
+        ID1[(uu & 4) != 4] = 0
+        ID2[(uu & 4) != 4] = 0
+
+        QB   = QB.reshape((Nx, Ny, sc[1]), order="F")
+        QL   = QL.reshape((Nx, Ny, sc[1]), order="F")
+        ID1   = ID1.reshape((Nx, Ny, sc[1]), order="F")
+        ID2   = ID2.reshape((Nx, Ny, sc[1]), order="F")
 
         corona_Bavg         = QB[:, :, corona_base : sc[1]].T
         chromo_uniform_Bavg = QB[:, :, 0 : corona_base].T
@@ -160,6 +163,8 @@ class GXRadioImageComputing:
 
         chromo_uniform_ID1 = ID1[:, :, 0 : corona_base].T
         chromo_uniform_ID2 = ID2[:, :, 0 : corona_base].T
+
+        #pdb.set_trace()
 
         model_dt_varlist = [
                 ('Nx', np.int32),
@@ -225,7 +230,7 @@ class GXRadioImageComputing:
         model_f.close()
         header["obs_time"] = Time(header["obs_time"])
         return self.load_model_dict(chromo_box_loaded, header)
-    
+
     def load_model_sav(self, file_name):
         model_data = io.readsav(file_name)
         lon = model_data.box.index[0].CRVAL1[0]
@@ -244,8 +249,9 @@ class GXRadioImageComputing:
 
         lonC=hgs.lon.to(u.deg).value
         latC=lat
+
         dr = model_data.box.dr[0]
-    
+
         dx=dr[0]*RSun
         dy=dr[1]*RSun
         dz_uniform=dr[2]*RSun
@@ -312,11 +318,14 @@ class GXRadioImageComputing:
             QB = model_data.box.avfield[0].T.copy()
             QL = model_data.box.physlength[0].T.copy()*RSun
             uu = model_data.box.status[0].T
-            startidx = model_data.box.startidx[0]
-            endidx   = model_data.box.endidx[0]
+            startidx = model_data.box.startidx[0].T.copy()
+            endidx   = model_data.box.endidx[0].T.copy()
 
-            ID1 = chromo_mask[startidx]
-            ID2 = chromo_mask[endidx]
+            startidx[startidx >= np.prod(chromo_mask.shape)] = np.argmax(chromo_mask.flat) # argmax is IDL compatibility
+            endidx[endidx     >= np.prod(chromo_mask.shape)] = np.argmax(chromo_mask.flat)
+
+            ID1 = chromo_mask.flat[startidx]
+            ID2 = chromo_mask.flat[endidx]
 
             QB[(uu & 4) != 4] = 0
             QL[(uu & 4) != 4] = 0
@@ -334,7 +343,9 @@ class GXRadioImageComputing:
 
         chromo_uniform_ID1 = ID1[:, :, 0 : corona_base].T
         chromo_uniform_ID2 = ID2[:, :, 0 : corona_base].T
-    
+
+        #pdb.set_trace()
+
         model_dt_varlist = [
                 ('Nx', np.int32),
                 ('Ny', np.int32),
