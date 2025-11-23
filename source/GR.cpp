@@ -1,7 +1,7 @@
+#include "ExtMath.h"
 #include <math.h>
 #include <float.h>
 #include <stdlib.h>
-#include "ExtMath.h"
 #include "Plasma.h"
 
 void FindGR_single(double f, double theta, int sigma, int s, double f_p, double f_B, double n_e, double T0, double LB, 

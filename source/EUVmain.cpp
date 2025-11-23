@@ -1,8 +1,8 @@
+#include "ExtMath.h"
 #include <stdlib.h>
 #include <math.h>
 #include <memory.h>
 #include "IDLinterface.h"
-#include "ExtMath.h"
 #include "RenderIrregular.h"
 #include "Plasma.h"
 #include "GXdefs.h"
@@ -185,10 +185,10 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  wy[0]=b_yc-b_dy*(b_Ny-1)/2;
  for (int j=1; j<b_Ny; j++) wy[j]=wy[j-1]+b_dy;
 
- double *fluxCorona=(double*)malloc(b_Nx*b_Ny*rs_Nch*sizeof(double));
- double *fluxTR=(double*)malloc(b_Nx*b_Ny*rs_Nch*sizeof(double));
- memset(fluxCorona, 0, b_Nx*b_Ny*rs_Nch*sizeof(double));
- memset(fluxTR, 0, b_Nx*b_Ny*rs_Nch*sizeof(double));
+ double *fluxCorona=(double*)malloc(sizeof(double)*b_Nx*b_Ny*rs_Nch);
+ double *fluxTR=(double*)malloc(sizeof(double)*b_Nx*b_Ny*rs_Nch);
+ memset(fluxCorona, 0, sizeof(double)*b_Nx*b_Ny*rs_Nch);
+ memset(fluxTR, 0, sizeof(double)*b_Nx*b_Ny*rs_Nch);
 
  double *dz, *h;
 
@@ -199,8 +199,8 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  }
  else
  {
-  dz=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
-  h=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
+  dz=(double*)malloc(sizeof(double)*m_Nx*m_Ny*m_Nz);
+  h=(double*)malloc(sizeof(double)*m_Nx*m_Ny*m_Nz);
 
   for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) dz[i]=(double)m_dz[i];
 
@@ -237,7 +237,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
   LgridL=(double*)malloc(e_NL*sizeof(double));
   for (int j=0; j<e_NL; j++) LgridL[j]=log((double)e_Lrun[D2(e_NQ, 0, j)]);
 
-  QgridL=(double*)malloc(e_NQ*e_NL*sizeof(double));
+  QgridL=(double*)malloc(sizeof(double)*e_NQ*e_NL);
   for (int i=0; i<e_NQ*e_NL; i++) QgridL[i]=log((double)e_Qrun[i]);
 
   Tgrid=(double*)malloc(e_NT*sizeof(double));
@@ -266,7 +266,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
    rs_te1[i]=pow(10.0, rs_logte1[i]);
   }
      
-  rs_all1=(double*)malloc(rs_NT1*rs_Nch*sizeof(double));
+  rs_all1=(double*)malloc(sizeof(double)*rs_NT1*rs_Nch);
   for (int j=0; j<rs_Nch; j++) for (int i=0; i<rs_NT1; i++) rs_spl_arr[j]->Interpolate(rs_logte1[i], rs_all1+i+j*rs_NT1, 0);
 
   EUV_integrand=(double*)malloc(rs_NT1*sizeof(double));
@@ -274,10 +274,11 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 
  double H_corona=corona_Hscale*cp_Tbase;
 
- char *flags=(char*)malloc(m_Nx*m_Ny*m_Nz*sizeof(char));
- memset(flags, 0, m_Nx*m_Ny*m_Nz*sizeof(char));
+ char *flags=(char*)malloc(sizeof(char)*m_Nx*m_Ny*m_Nz);
+ memset(flags, 0, sizeof(char)*m_Nx*m_Ny*m_Nz);
 
  int Nvoxels=0;
+ int arrN=300;
  int *VoxList=(int*)malloc(arrN*sizeof(int));
  double *ds=(double*)malloc(arrN*sizeof(double));
  double *xmid=(double*)malloc(arrN*sizeof(double));
@@ -286,10 +287,11 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 
  void *ARGV[11];
 
- int Rdim[3];
+ int Rdim[4];
  Rdim[0]=m_Nx;
  Rdim[1]=m_Ny;
  Rdim[2]=m_Nz;
+ Rdim[3]=arrN;
 
  double Rdxdy[2];
  Rdxdy[0]=m_dx;
@@ -357,7 +359,29 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
   ARGV[9]=(void*)ymid;
   ARGV[10]=(void*)zmid;
 
-  int res=RENDER(11, ARGV);
+  int res=1;
+  while (res!=0)
+  {
+   res=RENDER(11, ARGV);
+
+   if (res!=0)
+   {
+	arrN+=100;
+	Rdim[3]=arrN;
+
+	VoxList=(int*)realloc(VoxList, arrN*sizeof(int));
+    ds=(double*)realloc(ds, arrN*sizeof(double));
+    xmid=(double*)realloc(xmid, arrN*sizeof(double));
+    ymid=(double*)realloc(ymid, arrN*sizeof(double));
+    zmid=(double*)realloc(zmid, arrN*sizeof(double));
+
+	ARGV[6]=(void*)VoxList;
+    ARGV[7]=(void*)ds;
+    ARGV[8]=(void*)xmid;
+    ARGV[9]=(void*)ymid;
+    ARGV[10]=(void*)zmid;
+   }
+  }
        
   int done=0;
   int TR_on=0;
@@ -583,13 +607,13 @@ extern "C" int ComputeEUV(int argc, void **argv)
  __int32 *o_flagsAll=(__int32*)argv[5];
  __int32 *o_flagsCorona=o_flagsAll+6;
 
- char *flags=(char*)malloc(m_Nx*m_Ny*m_Nz*sizeof(char));
- memset(flags, 0, m_Nx*m_Ny*m_Nz*sizeof(char));
+ char *flags=(char*)malloc(sizeof(char)*m_Nx*m_Ny*m_Nz);
+ memset(flags, 0, sizeof(char)*m_Nx*m_Ny*m_Nz);
 
  void *SHtable=(argc>6) ? argv[6] : 0;
 
- double *dz=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
- double *h=(double*)malloc(m_Nx*m_Ny*m_Nz*sizeof(double));
+ double *dz=(double*)malloc(sizeof(double)*m_Nx*m_Ny*m_Nz);
+ double *h=(double*)malloc(sizeof(double)*m_Nx*m_Ny*m_Nz);
 
  for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) dz[i]=(double)m_dz[i];
 

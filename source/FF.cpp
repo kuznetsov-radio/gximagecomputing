@@ -1,7 +1,7 @@
+#include "ExtMath.h"
 #include <math.h>
 #include <float.h>
 #include <stdlib.h>
-#include "ExtMath.h"
 #include "Plasma.h"
 #include "Coulomb.h"
 #include "Zeta.h"

@@ -1,7 +1,7 @@
+#include "ExtMath.h"
 #include <stdlib.h>
 #include <math.h>
 #include <float.h>
-#include "ExtMath.h"
 #include "IDLinterface.h"
 
 void CrossP(double *a, double *b, double *axb) //cross product, c = a \times b

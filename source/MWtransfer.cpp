@@ -1,9 +1,9 @@
+#include "ExtMath.h"
 #include <stdlib.h>
 #include <math.h>
 #include <float.h>
 #include <memory.h>
 #include "Plasma.h"
-#include "ExtMath.h"
 #include "DEM.h"
 #include "FF.h"
 #include "Neutrals.h"

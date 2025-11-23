@@ -1,5 +1,5 @@
-#include <math.h>
 #include "ExtMath.h"
+#include <math.h>
 #include "Plasma.h"
 
 #define cst_min 1e-5
