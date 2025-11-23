@@ -1,9 +1,14 @@
 #pragma once
 
+#ifdef WINDOWS
+#define _USE_MATH_DEFINES //required to compile for windows
+#endif
+
+#include <cmath> // required everywhere
+
 #ifndef WINDOWS
-#include <cmath>
+#define finite isfinite
 #else
-#define _USE_MATH_DEFINES
 #define finite _finite
 #endif
 
