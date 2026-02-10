@@ -68,6 +68,7 @@ class GXRadioImageComputing:
 
         if system == "Windows":
             candidates.extend([
+                module_dir / "RenderGRFF.pyd",
                 module_dir / "RenderGRFF_64.dll",
                 module_dir / "RenderGRFF_32.dll",
                 binaries_dir / "RenderGRFF_64.dll",
@@ -89,6 +90,7 @@ class GXRadioImageComputing:
         candidates.extend(sorted(module_dir.glob("RenderGRFF*.so")))
         candidates.extend(sorted(module_dir.glob("RenderGRFF*.dylib")))
         candidates.extend(sorted(module_dir.glob("RenderGRFF*.dll")))
+        candidates.extend(sorted(module_dir.glob("RenderGRFF*.pyd")))
         return [candidate for candidate in candidates if candidate.exists()]
 
     @staticmethod
