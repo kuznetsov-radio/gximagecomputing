@@ -38,13 +38,11 @@ jobs:
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.1
-        # env:
-        #   CIBW_SOME_OPTION: value
-        #    ...
-        # with:
-        #   package-dir: .
-        #   output-dir: wheelhouse
-        #   config-file: "{package}/pyproject.toml"
+        env:
+          # Avoid 32-bit Windows wheels (win32) which are not supported by
+          # our dependency stack on CPython 3.12.
+          CIBW_ARCHS_WINDOWS: AMD64
+          CIBW_SKIP: "*-win32"
 
       - uses: actions/upload-artifact@v4
         with:
