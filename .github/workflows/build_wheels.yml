@@ -42,6 +42,8 @@ jobs:
           # Avoid 32-bit Windows wheels (win32) which are not supported by
           # our dependency stack on CPython 3.12.
           CIBW_ARCHS_WINDOWS: AMD64
+          # Avoid 32-bit Linux wheels (i686); we only support x86_64 in CI.
+          CIBW_ARCHS_LINUX: x86_64
           CIBW_SKIP: "*-win32"
 
       - uses: actions/upload-artifact@v4
