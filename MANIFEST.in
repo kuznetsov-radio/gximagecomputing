@@ -1,0 +1,3 @@
+include pyinit.cpp
+recursive-include source *.h *.hpp *.c *.cc *.cpp *.cxx *.cu *.txt
+recursive-include binaries *.so *.dylib *.dll

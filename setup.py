@@ -3,21 +3,21 @@
 import platform
 from setuptools import setup, Extension
 from pathlib import Path
-import pdb
-import sys
+import os
+import subprocess
 
-common_compile_flags = ['-std=c++11', '-O3', '-fPIC', '-fopenmp']
+common_compile_flags = ['-std=c++11', '-O3', '-fPIC']
 
 compile_flags = {
     'Linux':   ["-DLINUX",   *common_compile_flags],
     'Windows': ["-DWINDOWS"],
-    'Darwin':  ["-DMACOS",   *common_compile_flags]
+    'Darwin':  ["-DMACOS", *common_compile_flags, "-Xpreprocessor", "-fopenmp"],
 }
 
 link_flags = {
     'Linux':   ["-fopenmp"],
     'Windows': ["-fopenmp"],
-    'Darwin':  ["-fopenmp"]
+    'Darwin':  ["-lomp"],
 }
 
 current_os = platform.system()
@@ -29,6 +29,17 @@ if current_os in link_flags:
 else:
     extra_link    = []
     extra_compile = []
+
+if current_os == "Darwin":
+    brew_prefix = os.environ.get("HOMEBREW_PREFIX")
+    if not brew_prefix:
+        try:
+            brew_prefix = subprocess.check_output(["brew", "--prefix"], text=True).strip()
+        except Exception:
+            brew_prefix = None
+    if brew_prefix:
+        extra_compile += [f"-I{brew_prefix}/include", f"-I{brew_prefix}/opt/libomp/include"]
+        extra_link += [f"-L{brew_prefix}/lib", f"-L{brew_prefix}/opt/libomp/lib"]
 
 source_dir = Path("./source")
 source_files = [str(source_dir / x.name) for x in sorted(source_dir.glob("*.cpp"))]

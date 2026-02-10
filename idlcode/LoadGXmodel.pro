@@ -1,62 +1,106 @@
+function LoadGXmodel__load_box, infile
+ inlower=strlowcase(string(infile))
+ nch=strlen(inlower)
+ ext3=''
+ ext4=''
+ ext5=''
+ if nch ge 3 then ext3=strmid(inlower, nch-3, 3)
+ if nch ge 4 then ext4=strmid(inlower, nch-4, 4)
+ if nch ge 5 then ext5=strmid(inlower, nch-5, 5)
+ if (ext4 eq '.sav') or (ext4 eq '.xdr') then begin
+  restore, infile
+  return, box
+ endif
+ if (ext3 eq '.h5') or (ext5 eq '.hdf5') then begin
+  resolve_routine, 'ConvertToGX', /either
+  return, ConvertToGX(infile)
+ endif
+ message, 'Unsupported model format: '+infile
+end
+
 function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime
- restore, infile
- 
- obstime=anytim(box.index.date_obs)
- 
- setenv, 'WCS_RSUN=6.96d8' ;the same command as in GX Simulator routines
- wcs=fitshead2wcs(box.index)
- wcs_convert_from_coord, wcs, wcs.crval, 'hg', lonC, latC
- RSun=wcs_rsun(unit='cm')
- 
+ box=LoadGXmodel__load_box(infile)
+
+ obstime=0d
+ if tag_exist(box, 'INDEX') and tag_exist(box.index, 'DATE_OBS') then obstime=anytim(box.index.date_obs)
+
+ lonC=0d
+ latC=0d
+ RSun=6.96d10
+
+ if tag_exist(box, 'INDEX') then begin
+  ; Prefer robust WCS conversion when full header is available.
+  catch, err
+  if err eq 0 then begin
+   setenv, 'WCS_RSUN=6.96d8' ; same command as GX Simulator routines
+   wcs=fitshead2wcs(box.index)
+   wcs_convert_from_coord, wcs, wcs.crval, 'hg', lonC, latC
+   RSun=wcs_rsun(unit='cm')
+   catch, /cancel
+  endif else begin
+   catch, /cancel
+  endelse
+
+  ; Fallback to direct heliographic tags when WCS parsing is unavailable.
+  if tag_exist(box.index, 'HGLN_OBS') then lonC=double(box.index.hgln_obs) $
+  else if tag_exist(box.index, 'CRVAL1') then lonC=double(box.index.crval1)
+  if tag_exist(box.index, 'CRVAL2') then latC=double(box.index.crval2)
+ endif
+
  if exist(newTime) then begin
   obstime1=anytim(newTime)
-  ddays=(obstime1-obstime)/86400
+  ddays=(obstime1-obstime)/86400d
   lonC+=diff_rot(ddays, latC, /synodic)
   obstime=obstime1
  endif
- 
+
  a=get_sun(anytim(obsTime, /ex))
- DSun=a[0]*1.495978707d13 
+ DSun=a[0]*1.495978707d13
  b0Sun=a[11]
- 
+ if tag_exist(box, 'INDEX') and tag_exist(box.index, 'DSUN_OBS') then DSun=double(box.index.dsun_obs)
+ if tag_exist(box, 'INDEX') and tag_exist(box.index, 'SOLAR_B0') then b0Sun=double(box.index.solar_b0)
+ ; pyAMPP HDF5 index stores DSUN_OBS in meters; RenderGRFF expects centimeters.
+ ; Keep backward compatibility with legacy SAV values already in centimeters.
+ if DSun lt 1d12 then DSun=DSun*100d
+
  dx=box.dr[0]*RSun
  dy=box.dr[1]*RSun
  dz_uniform=box.dr[2]*RSun
  dz=box.dz*RSun
- 
+
  s=size(box.dz, /dimensions)
  sc=size(box.bcube, /dimensions)
- 
+
  Nx=s[0]
  Ny=s[1]
  Nz=s[2]
- 
+
  chromo_layers=box.chromo_layers
  corona_layers=s[2]-box.chromo_layers
  corona_base=box.corona_base
- 
+
  Bx=fltarr(s)
  By=fltarr(s)
  Bz=fltarr(s)
- 
+
  Bx[*, *, 0 : chromo_layers-1]=box.chromo_bcube[*, *, *, 0]
  By[*, *, 0 : chromo_layers-1]=box.chromo_bcube[*, *, *, 1]
  Bz[*, *, 0 : chromo_layers-1]=box.chromo_bcube[*, *, *, 2]
- 
+
  Bx[*, *, chromo_layers : s[2]-1]=box.bcube[*, *, box.corona_base : sc[2]-1, 0]
  By[*, *, chromo_layers : s[2]-1]=box.bcube[*, *, box.corona_base : sc[2]-1, 1]
  Bz[*, *, chromo_layers : s[2]-1]=box.bcube[*, *, box.corona_base : sc[2]-1, 2]
- 
+
  chromo_n0=fltarr(s[0], s[1], chromo_layers)
  chromo_np=fltarr(s[0], s[1], chromo_layers)
  chromo_nHI=fltarr(s[0], s[1], chromo_layers)
  chromo_T0=fltarr(s[0], s[1], chromo_layers)
- 
+
  chromo_n0[box.chromo_idx]=box.chromo_n
  chromo_np[box.chromo_idx]=box.n_p
  chromo_nHI[box.chromo_idx]=box.n_hi
  chromo_T0[box.chromo_idx]=box.chromo_T
- 
+
  if tag_exist(box, 'BMED') then begin ;old version
   QB=fltarr(s[0], s[1], sc[2])
   QB[box.idx]=box.bmed
@@ -65,7 +109,7 @@ function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime
   ID1=bytarr(s[0], s[1], s[2])
   ID1[box.idx]=box.base.chromo_mask[box.foot1]
   ID2=bytarr(s[0], s[1], s[2])
-  ID2[box.idx]=box.base.chromo_mask[box.foot2]  
+  ID2[box.idx]=box.base.chromo_mask[box.foot2]
  endif else if tag_exist(box, 'AVFIELD') then begin ;new version
   QB=box.avfield
   QL=box.physlength*RSun
@@ -78,22 +122,22 @@ function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime
    ID1[u]=0
    ID2[u]=0
   endif
- endif 
- 
+ endif
+
  corona_Bavg=QB[*, *, box.corona_base : sc[2]-1]
  chromo_uniform_Bavg=QB[*, *, 0 : box.corona_base-1]
- 
+
  corona_L=QL[*, *, box.corona_base : sc[2]-1]
  chromo_uniform_L=QL[*, *, 0 : box.corona_base-1]
- 
+
  if ~keyword_set(NoVoxelID) then VoxelID=gx_box2id(box) $
  else VoxelID=bytarr(s)
- 
+
  corona_ID1=ID1[*, *, box.corona_base : sc[2]-1]
  corona_ID2=ID2[*, *, box.corona_base : sc[2]-1]
  chromo_uniform_ID1=ID1[*, *, 0 : box.corona_base-1]
  chromo_uniform_ID2=ID2[*, *, 0 : box.corona_base-1]
- 
+
  model={Nx: long(Nx), $
         Ny: long(Ny), $
         Nz: long(Nz), $
@@ -126,6 +170,6 @@ function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime
         corona_ID2: byte(corona_ID2), $
         chromo_uniform_ID1: byte(chromo_uniform_ID1), $
         chromo_uniform_ID2: byte(chromo_uniform_ID2)}
-        
+
  return, model
 end
