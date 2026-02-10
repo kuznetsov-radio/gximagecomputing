@@ -44,7 +44,6 @@ jobs:
           CIBW_ARCHS_WINDOWS: AMD64
           # Avoid 32-bit Linux wheels (i686); we only support x86_64 in CI.
           CIBW_ARCHS_LINUX: x86_64
-          CIBW_SKIP: "*-win32"
 
       - uses: actions/upload-artifact@v4
         with:
