@@ -6,6 +6,7 @@ build-backend = "setuptools.build_meta"
 name = "gximagecomputing"
 version = "0.0.2.1"
 readme = "README.md"
+requires-python = ">=3.12"
 
 dependencies = [
     'importlib-metadata; python_version>="3.10"',
@@ -14,6 +15,7 @@ dependencies = [
     "h5py",
     "sunpy",
     "scipy",
+    "matplotlib",
 ]
 
 description = "This code computes the 2D maps of the solar gyroresonance and free-free microwave emission using the models of active regions created by the GX Simulator."
@@ -41,6 +43,7 @@ Repository = "https://github.com/kuznetsov-radio/gximagecomputing/"
 [tool.cibuildwheel]
 skip = ["cp36*", "cp37*", "cp38*", "cp39*", "cp310*","cp311*", "pp*", "*musl*"]
 build-frontend = "build"
+test-command = "python -c \"from gximagecomputing.radio import GXRadioImageComputing; GXRadioImageComputing(); print('wheel-ok')\""
 
 [[tool.cibuildwheel.overrides]]
 select = "cp*"
@@ -75,3 +78,12 @@ CPPFLAGS = "-I$(brew --prefix libomp)/include"
 LDFLAGS = "-L$(brew --prefix libomp)/lib"
 
 [tool.cibuildwheel.windows]
+
+[project.scripts]
+gxrender-map-view = "gximagecomputing.viz.render_map_view:main"
+gxrender-mw = "gximagecomputing.workflows.render_mw:main"
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]

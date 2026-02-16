@@ -2,6 +2,8 @@
 
 This code computes 2D maps of the solar microwave (gyroresonance and free-free) and EUV (spectral lines) emission, using models of active regions created by the [**GX Simulator**](https://github.com/Gelu-Nita/GX_SIMULATOR/) (requires SolarSoft GX_Simulator package).
 
+[![Build And Publish Wheels](https://github.com/kuznetsov-radio/gximagecomputing/actions/workflows/build_wheels.yml/badge.svg)](https://github.com/kuznetsov-radio/gximagecomputing/actions/workflows/build_wheels.yml)
+
 ----
 
 ## Quick Start
@@ -10,9 +12,114 @@ See the example files:
 
 - `./examples/RenderExampleMW.pro`
 - `./examples/RenderExampleEUV.pro`
-- `./examples/RenderExample.py`
+- `./examples/RenderExampleMW.py`
 
 **Note:** Sample GX Simulator model and EBTEL data are not included.
+
+----
+
+## Python Environment Notes
+
+### Imports (`PYTHONPATH`)
+
+If running scripts directly from the repository checkout (without installing the package), add `src` to `PYTHONPATH`:
+
+```bash
+PYTHONPATH=src python examples/RenderExampleMW.py --help
+```
+
+If installed with pip, this is usually not needed:
+
+```bash
+pip install .
+```
+
+### Writable Config/Cache Directories (SunPy/Matplotlib)
+
+Some environments have non-writable default user config/cache folders. In that case, use writable overrides:
+
+```bash
+SUNPY_CONFIGDIR=/tmp/sunpy_cfg MPLCONFIGDIR=/tmp/mpl_cfg python examples/RenderExampleMW.py --help
+```
+
+If needed, create those folders first:
+
+```bash
+mkdir -p /tmp/sunpy_cfg /tmp/mpl_cfg
+```
+
+This avoids runtime errors such as:
+- `Could not write to SUNPY_CONFIGDIR=...`
+- Matplotlib/fontconfig cache permission warnings
+
+### EBTEL Table Path (`GXIMAGECOMPUTING_EBTEL_PATH`)
+
+The Python renderer expects an EBTEL `.sav` file path. You can pass it explicitly with `--ebtel-path`, or set one environment variable once per shell session:
+
+```bash
+export GXIMAGECOMPUTING_EBTEL_PATH="$SSW/packages/gx_simulator/euv/ebtel/ebtel_ss.sav"
+```
+
+If your SolarSoft installation does not define `$SSW`, use an absolute path:
+
+```bash
+export GXIMAGECOMPUTING_EBTEL_PATH="/full/path/to/ssw/packages/gx_simulator/euv/ebtel/ebtel_ss.sav"
+```
+
+Then run:
+
+```bash
+python examples/RenderExampleMW.py --model-path /path/to/your.chr.sav --model-format auto
+```
+
+----
+
+## Python Data Branches (Non-Interfering)
+
+The Python API now treats CHR inputs as two explicit branches that both normalize to the same internal `ChromoModel` representation consumed by the rendering library:
+
+- **IDL branch**: `load_model_sav(...)` for GX Simulator `.sav` CHR models.
+- **pyAMPP branch**: `load_model_hdf(...)` for current pyAMPP `.h5` CHR models (`/chromo` group).
+
+Both branches are converted into one internal data layout before calling the native renderer, so loader-specific format changes do not leak into rendering logic.
+
+----
+
+## Building Native Library (Linux/macOS)
+
+The `source/makefile` supports platform-aware builds and copies outputs into `./binaries`.
+
+### Build
+
+```bash
+cd source
+make
+```
+
+### Outputs
+
+- Linux: `binaries/RenderGRFF.so`
+- macOS arm64: `binaries/RenderGRFF_arm64.so`
+- macOS x86_64: `binaries/RenderGRFF_x86_64.so`
+
+### macOS prerequisites
+
+Install OpenMP runtime (Homebrew):
+
+```bash
+brew install libomp
+```
+
+If Homebrew is in a non-default prefix, set include/link flags explicitly:
+
+```bash
+make CPPFLAGS='-I/opt/homebrew/opt/libomp/include' LDFLAGS='-L/opt/homebrew/opt/libomp/lib'
+```
+
+### Binary Wheel Releases
+
+For maintainers: release process and exact publish commands are documented in `RELEASING.md`.
+CI workflow: `.github/workflows/build_wheels.yml`
 
 ----
 

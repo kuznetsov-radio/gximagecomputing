@@ -1,12 +1,27 @@
-name: Build
+name: Build And Publish Wheels
 
-on: [push, pull_request]
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      publish_target:
+        description: "Optional manual publish target"
+        required: true
+        default: "none"
+        type: choice
+        options:
+          - none
+          - testpypi
 
 jobs:
   build_wheels:
     name: Build wheels on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
       matrix:
         # macos-13 is an intel runner, macos-14 is apple silicon
         os: [ubuntu-latest, windows-latest, macos-13, macos-14]
@@ -19,17 +34,16 @@ jobs:
       
       - uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
+          python-version: "3.12"
 
       - name: Build wheels
         uses: pypa/cibuildwheel@v2.19.1
-        # env:
-        #   CIBW_SOME_OPTION: value
-        #    ...
-        # with:
-        #   package-dir: .
-        #   output-dir: wheelhouse
-        #   config-file: "{package}/pyproject.toml"
+        env:
+          # Avoid 32-bit Windows wheels (win32) which are not supported by
+          # our dependency stack on CPython 3.12.
+          CIBW_ARCHS_WINDOWS: AMD64
+          # Avoid 32-bit Linux wheels (i686); we only support x86_64 in CI.
+          CIBW_ARCHS_LINUX: x86_64
 
       - uses: actions/upload-artifact@v4
         with:
@@ -66,6 +80,23 @@ jobs:
         path: dist
         merge-multiple: true
     - uses: pypa/gh-action-pypi-publish@release/v1
-#      with:
-#        #user: guido
-#        password: ${{ secrets.TEST }}
+      with:
+        packages-dir: dist
+
+  upload_testpypi:
+    needs: [build_wheels, make_sdist]
+    environment: release-test
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_target == 'testpypi'
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: cibw-*
+        path: dist
+        merge-multiple: true
+    - uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+        packages-dir: dist

@@ -1,0 +1,13 @@
+build/
+dist/
+*.egg-info/
+__pycache__/
+*.py[cod]
+
+# Local compiled extension artifacts from editable/dev builds
+src/gximagecomputing/RenderGRFF*.so
+src/gximagecomputing/RenderGRFF*.dylib
+src/gximagecomputing/RenderGRFF*.dll
+
+# Local validation data (large; keep outside git history)
+test_data/
