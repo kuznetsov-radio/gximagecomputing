@@ -7,17 +7,31 @@ This project is configured to publish precompiled wheels via GitHub Actions + `c
 Users should be able to run:
 
 ```bash
-pip install gximagecomputing
+pip install pyGXrender
 ```
 
 and receive a wheel containing the compiled `RenderGRFF` extension for their platform (instead of building locally).
 
+Note: the PyPI distribution name is `pyGXrender`, while the Python import
+package remains `gximagecomputing`.
+
 ## One-Time PyPI Setup
 
-1. Create the package on PyPI (first release only).
-2. In PyPI project settings, configure **Trusted Publisher** for this repository.
-3. (Recommended) Create the package on TestPyPI as well and configure **Trusted Publisher** there.
-4. In GitHub, ensure the workflow can run with `id-token: write` (already set in workflow).
+1. Verify that `pyGXrender` is available on PyPI (or confirm project ownership if it already exists).
+2. Create the package on PyPI (first release only).
+3. In PyPI project settings, configure **Trusted Publisher** for this repository.
+4. (Recommended) Create the package on TestPyPI as well and configure **Trusted Publisher** there.
+5. In GitHub, ensure the workflow can run with `id-token: write` (already set in workflow).
+
+Quick preflight checks:
+
+```bash
+python -m pip index versions pyGXrender
+python -m pip index versions pygxrender
+```
+
+If either command returns existing releases, confirm project ownership in PyPI
+before attempting upload.
 
 ## CI Workflow
 
@@ -89,7 +103,7 @@ Then verify install from TestPyPI:
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple gximagecomputing
+python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple pyGXrender
 python -c "import gximagecomputing; print('ok', gximagecomputing.__file__)"
 gxrender-mw --help
 ```
@@ -100,7 +114,7 @@ In a clean environment:
 
 ```bash
 python -m pip install --upgrade pip
-python -m pip install gximagecomputing
+python -m pip install pyGXrender
 python -c "import gximagecomputing; print('ok', gximagecomputing.__file__)"
 gxrender-mw --help
 ```

@@ -3,6 +3,7 @@
 import ctypes
 import platform
 import re
+import shlex
 import numpy as np
 import scipy.io as io
 import h5py
@@ -121,6 +122,163 @@ class GXRadioImageComputing:
                 loaded[key] = group[key][()]
         return loaded
 
+    @staticmethod
+    def _normalize_cube_xyz(arr: np.ndarray, nx_hint: int | None = None, ny_hint: int | None = None) -> np.ndarray:
+        """Normalize 3D cube to internal (x, y, z) layout."""
+        a = np.asarray(arr)
+        if a.ndim != 3:
+            return a
+
+        if nx_hint is not None and ny_hint is not None:
+            if a.shape[0] == nx_hint and a.shape[1] == ny_hint:
+                return a
+            if a.shape[0] == ny_hint and a.shape[1] == nx_hint:
+                return a.transpose((1, 0, 2))
+            if a.shape[1] == ny_hint and a.shape[2] == nx_hint:
+                return a.transpose((2, 1, 0))
+            if a.shape[1] == nx_hint and a.shape[2] == ny_hint:
+                return a.transpose((1, 2, 0))
+
+        # Legacy fallback (pre-v0.2 files were typically y/x swapped).
+        return a.transpose((1, 0, 2))
+
+    @classmethod
+    def _normalize_vector_cube_xyzc(
+        cls, arr: np.ndarray, nx_hint: int | None = None, ny_hint: int | None = None
+    ) -> np.ndarray:
+        """Normalize vector cube to internal (x, y, z, c) layout."""
+        a = np.asarray(arr)
+        if a.ndim != 4:
+            return a
+
+        if a.shape[-1] == 3:
+            comps = [cls._normalize_cube_xyz(a[..., i], nx_hint, ny_hint) for i in range(3)]
+            return np.stack(comps, axis=-1)
+        if a.shape[0] == 3:
+            comps = [cls._normalize_cube_xyz(a[i, ...], nx_hint, ny_hint) for i in range(3)]
+            return np.stack(comps, axis=-1)
+        return a
+
+    @classmethod
+    def _components_to_vector_cube_xyzc(
+        cls,
+        bx: np.ndarray,
+        by: np.ndarray,
+        bz: np.ndarray,
+        nx_hint: int | None = None,
+        ny_hint: int | None = None,
+    ) -> np.ndarray:
+        bx_i = cls._normalize_cube_xyz(bx, nx_hint, ny_hint)
+        by_i = cls._normalize_cube_xyz(by, nx_hint, ny_hint)
+        bz_i = cls._normalize_cube_xyz(bz, nx_hint, ny_hint)
+        if bx_i.shape != by_i.shape or bx_i.shape != bz_i.shape:
+            raise ValueError(
+                f"Incompatible vector component shapes: bx={bx_i.shape}, by={by_i.shape}, bz={bz_i.shape}"
+            )
+        return np.stack((bx_i, by_i, bz_i), axis=-1)
+
+    @staticmethod
+    def _scalar_from_any(value: Any) -> Any:
+        arr = np.asarray(value)
+        if arr.ndim == 0:
+            return arr.item()
+        if arr.size == 1:
+            return arr.reshape(-1)[0].item()
+        return value
+
+    @staticmethod
+    def _parse_execute_time(execute_text: str) -> str | None:
+        try:
+            tokens = shlex.split(execute_text)
+        except ValueError:
+            tokens = execute_text.split()
+        for i, tok in enumerate(tokens):
+            if tok == "--time" and i + 1 < len(tokens):
+                return tokens[i + 1]
+            if tok.startswith("--time="):
+                return tok.split("=", 1)[1]
+        return None
+
+    @staticmethod
+    def _decode_dataset_scalar(ds) -> Any:
+        value = ds[()]
+        if isinstance(value, (bytes, np.bytes_)):
+            return value.decode("utf-8", "ignore")
+        return value
+
+    @classmethod
+    def _fill_header_from_base_index(cls, model_f: h5py.File, header: Dict[str, Any]) -> None:
+        if "base" not in model_f or "index" not in model_f["base"]:
+            return
+        raw = cls._decode_dataset_scalar(model_f["base"]["index"])
+        text = raw if isinstance(raw, str) else str(raw)
+
+        def _extract_fits_card(key: str) -> str | None:
+            # Match FITS-header style cards, e.g.:
+            #   CRVAL1  = -17.0599
+            #   DATE-OBS= '2025-11-26T15:34:31.000'
+            m = re.search(rf"(?m)^\s*{re.escape(key)}\s*=\s*([^\n/]+)", text)
+            if not m:
+                return None
+            value = m.group(1).strip()
+            if value.startswith("'"):
+                m_str = re.match(r"'([^']*)'", value)
+                if m_str:
+                    return m_str.group(1).strip()
+            return value.strip().strip("'")
+
+        if "lon" not in header:
+            mlon = re.search(r",\s*([+-]?\d+(?:\.\d+)?)\s*,\s*b'CRLN-CEA'", text)
+            if mlon:
+                header["lon"] = float(mlon.group(1))
+            else:
+                crval1 = _extract_fits_card("CRVAL1")
+                if crval1 is not None:
+                    try:
+                        header["lon"] = float(crval1)
+                    except ValueError:
+                        pass
+        if "lat" not in header:
+            mlat = re.search(r",\s*([+-]?\d+(?:\.\d+)?)\s*,\s*b'CRLT-CEA'", text)
+            if mlat:
+                header["lat"] = float(mlat.group(1))
+            else:
+                crval2 = _extract_fits_card("CRVAL2")
+                if crval2 is not None:
+                    try:
+                        header["lat"] = float(crval2)
+                    except ValueError:
+                        pass
+        if "obs_time" not in header:
+            date_obs = _extract_fits_card("DATE-OBS") or _extract_fits_card("DATE_OBS")
+            if date_obs:
+                header["obs_time"] = date_obs
+            else:
+                mtime = re.search(r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?", text)
+                if mtime:
+                    header["obs_time"] = mtime.group(0)
+        if "dsun_obs" not in header:
+            dsun_obs = _extract_fits_card("DSUN_OBS")
+            if dsun_obs is not None:
+                try:
+                    header["dsun_obs"] = float(dsun_obs)
+                except ValueError:
+                    pass
+            else:
+                mds = re.search(
+                    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?'\s*,\s*([0-9]+(?:\.[0-9]+)?(?:[eE][+-]?[0-9]+)?)",
+                    text,
+                )
+                if mds:
+                    header["dsun_obs"] = float(mds.group(1))
+        if "lonC" not in header:
+            hglon = _extract_fits_card("HGLN_OBS")
+            if hglon is not None:
+                try:
+                    header["lonC"] = float(hglon)
+                except ValueError:
+                    pass
+
     def load_ebtel(self, ebtel_file):
         ebtel_data = io.readsav(ebtel_file)
         s = ebtel_data["lrun"].shape
@@ -159,7 +317,35 @@ class GXRadioImageComputing:
         
         if "ddm_cor_run" in ebtel_data.keys():
             ebtel_c["DDM_cor_run"] = np.float32(ebtel_data["DDM_cor_run"])
-    
+        
+        return ebtel_c, ebtel_dt
+
+    @staticmethod
+    def load_ebtel_none():
+        """Return a minimal EBTEL struct with DEM/DDM disabled.
+
+        This matches the legacy IDL behavior for ebtelfile='':
+        heating tables are not used and the native library falls back to
+        isothermal/hydrostatic coronal plasma handling.
+        """
+        ebtel_dt = np.dtype(
+            [
+                ("DEM_on", np.int32),
+                ("DDM_on", np.int32),
+                ("NQ", np.int32),
+                ("NL", np.int32),
+                ("NT", np.int32),
+                ("Qrun", np.float32, (1, 1)),
+                ("Lrun", np.float32, (1, 1)),
+                ("logtdem", np.float32, (1,)),
+            ]
+        )
+        ebtel_c = np.zeros(1, dtype=ebtel_dt)
+        ebtel_c["DEM_on"] = 0
+        ebtel_c["DDM_on"] = 0
+        ebtel_c["NQ"] = 1
+        ebtel_c["NL"] = 1
+        ebtel_c["NT"] = 1
         return ebtel_c, ebtel_dt
 
     @dataclass
@@ -169,9 +355,56 @@ class GXRadioImageComputing:
 
     def _build_hdf_chromo_data(self, file_name):
         with h5py.File(file_name, "r") as model_f:
+            if "chromo" not in model_f:
+                raise KeyError("Missing required '/chromo' group in HDF5 model.")
             chromo_box = model_f["chromo"]
             model_dict = self._load_h5_group(chromo_box)
             header = {k: self._decode_if_bytes(v) for k, v in dict(chromo_box.attrs).items()}
+
+            ny_hint = None
+            nx_hint = None
+            if "base" in model_f and "bx" in model_f["base"]:
+                base_shape = np.asarray(model_f["base"]["bx"][:]).shape
+                if len(base_shape) == 2:
+                    ny_hint, nx_hint = int(base_shape[0]), int(base_shape[1])
+
+            # pyAMPP v0.2.0 stores GEN line metadata in '/lines' rather than '/chromo'.
+            if "lines" in model_f:
+                lines_box = self._load_h5_group(model_f["lines"])
+                for key in ("av_field", "phys_length", "voxel_status", "start_idx", "end_idx"):
+                    if key not in model_dict and key in lines_box:
+                        model_dict[key] = lines_box[key]
+
+            # v0.2.0 keeps coronal geometry in '/corona'.
+            if "corona" in model_f:
+                corona_box = self._load_h5_group(model_f["corona"])
+                if "dr" not in model_dict and "dr" in corona_box:
+                    model_dict["dr"] = corona_box["dr"]
+                if "corona_base" not in model_dict and "corona_base" in corona_box:
+                    model_dict["corona_base"] = corona_box["corona_base"]
+                if "bcube" not in model_dict:
+                    if all(k in corona_box for k in ("bx", "by", "bz")):
+                        model_dict["bcube"] = self._components_to_vector_cube_xyzc(
+                            corona_box["bx"], corona_box["by"], corona_box["bz"], nx_hint, ny_hint
+                        )
+                    elif "bcube" in corona_box:
+                        model_dict["bcube"] = corona_box["bcube"]
+
+            # Fallbacks for legacy files where metadata lived under '/chromo'.
+            if "dr" not in model_dict and "dr" in chromo_box:
+                model_dict["dr"] = chromo_box["dr"][:]
+            if "corona_base" not in model_dict and "corona_base" in chromo_box:
+                model_dict["corona_base"] = chromo_box["corona_base"][()]
+            if "chromo_bcube" not in model_dict:
+                if all(k in model_dict for k in ("bx", "by", "bz")):
+                    model_dict["chromo_bcube"] = self._components_to_vector_cube_xyzc(
+                        model_dict["bx"], model_dict["by"], model_dict["bz"], nx_hint, ny_hint
+                    )
+                elif "chromo_bcube" in chromo_box:
+                    model_dict["chromo_bcube"] = chromo_box["chromo_bcube"][:]
+            if "bcube" not in model_dict and "bcube" in chromo_box:
+                model_dict["bcube"] = chromo_box["bcube"][:]
+
             if "chromo_mask" not in model_dict and "base" in model_f and "chromo_mask" in model_f["base"]:
                 model_dict["chromo_mask"] = model_f["base"]["chromo_mask"][:]
             if "base" in model_f and "wcs_header" in model_f["base"]:
@@ -180,17 +413,69 @@ class GXRadioImageComputing:
                     m_lonc = re.search(r"CRVAL1\s*=\s*([+-]?\d+(?:\.\d+)?)", wcs_raw)
                     if m_lonc:
                         header["lonC"] = float(m_lonc.group(1))
+            # Fallback metadata if chromo attrs are incomplete.
+            if "corona" in model_f:
+                for key, value in dict(model_f["corona"].attrs).items():
+                    if key not in header:
+                        header[key] = self._decode_if_bytes(value)
+            if "metadata" in model_f and "execute" in model_f["metadata"] and "obs_time" not in header:
+                execute_text = self._decode_dataset_scalar(model_f["metadata"]["execute"])
+                if isinstance(execute_text, str):
+                    t_fallback = self._parse_execute_time(execute_text)
+                    if t_fallback:
+                        header["obs_time"] = t_fallback
+            self._fill_header_from_base_index(model_f, header)
+
         # Normalize H5 array orientation to the same internal convention used
-        # by SAV loading/IDL (`x,y,z[,c]`). Current pyAMPP H5 CHR products use
-        # swapped x/y for these datasets.
+        # by SAV loading/IDL (`x,y,z[,c]`).
         if "dz" in model_dict and np.asarray(model_dict["dz"]).ndim == 3:
-            model_dict["dz"] = np.asarray(model_dict["dz"]).transpose((1, 0, 2))
+            model_dict["dz"] = self._normalize_cube_xyz(np.asarray(model_dict["dz"]), nx_hint, ny_hint)
         if "bcube" in model_dict and np.asarray(model_dict["bcube"]).ndim == 4:
-            model_dict["bcube"] = np.asarray(model_dict["bcube"]).transpose((1, 0, 2, 3))
+            model_dict["bcube"] = self._normalize_vector_cube_xyzc(
+                np.asarray(model_dict["bcube"]), nx_hint, ny_hint
+            )
         if "chromo_bcube" in model_dict and np.asarray(model_dict["chromo_bcube"]).ndim == 4:
-            model_dict["chromo_bcube"] = np.asarray(model_dict["chromo_bcube"]).transpose((1, 0, 2, 3))
-        if "obs_time" in header:
-            header["obs_time"] = self._coerce_time(header["obs_time"])
+            model_dict["chromo_bcube"] = self._normalize_vector_cube_xyzc(
+                np.asarray(model_dict["chromo_bcube"]), nx_hint, ny_hint
+            )
+        if "chromo_layers" in model_dict:
+            model_dict["chromo_layers"] = int(self._scalar_from_any(model_dict["chromo_layers"]))
+        if "corona_base" in model_dict:
+            model_dict["corona_base"] = int(self._scalar_from_any(model_dict["corona_base"]))
+
+        required = (
+            "dr",
+            "dz",
+            "bcube",
+            "chromo_bcube",
+            "chromo_layers",
+            "corona_base",
+            "chromo_idx",
+            "chromo_n",
+            "n_p",
+            "n_hi",
+            "chromo_t",
+            "chromo_mask",
+            "av_field",
+            "phys_length",
+            "voxel_status",
+            "start_idx",
+            "end_idx",
+        )
+        missing = [key for key in required if key not in model_dict]
+        if missing:
+            raise KeyError(
+                "Missing required CHR datasets after compatibility resolution: "
+                + ", ".join(missing)
+            )
+
+        required_header = ("lon", "lat", "dsun_obs", "obs_time")
+        missing_header = [k for k in required_header if k not in header]
+        if missing_header:
+            raise KeyError(
+                "Missing required observation metadata fields: " + ", ".join(missing_header)
+            )
+        header["obs_time"] = self._coerce_time(header["obs_time"])
         return self.ChromoModelData(header=header, model=model_dict)
 
     def _build_sav_chromo_data(self, file_name):
@@ -289,6 +574,16 @@ class GXRadioImageComputing:
         chromo_layers=model_dict["chromo_layers"]
         corona_layers=Nz-chromo_layers
         corona_base=model_dict["corona_base"]
+
+        # Some pyAMPP products can have a 1-layer discrepancy between
+        # chromo_layers and corona_base metadata. Align corona_base so the
+        # stitched volume dimensions remain consistent with dz/Nz.
+        expected_corona_base = int(sc[1] - (Nz - chromo_layers))
+        if (sc[1] - int(corona_base)) != (Nz - chromo_layers):
+            if 0 <= expected_corona_base < sc[1]:
+                corona_base = expected_corona_base
+            else:
+                corona_base = int(np.clip(corona_base, 0, max(sc[1] - 1, 0)))
     
         Bx=np.zeros(s, dtype=np.float32, order="C")
         By=np.zeros(s, dtype=np.float32, order="C")
@@ -301,9 +596,13 @@ class GXRadioImageComputing:
         By[0:chromo_layers, :, :]=chromo_bcube[1, :, :, :]
         Bz[0:chromo_layers, :, :]=chromo_bcube[2, :, :, :]
     
-        Bx[chromo_layers : Nz, :, :]=bcube[0, corona_base : Nz, :, :]
-        By[chromo_layers : Nz, :, :]=bcube[1, corona_base : Nz, :, :]
-        Bz[chromo_layers : Nz, :, :]=bcube[2, corona_base : Nz, :, :]
+        cor_target = Nz - chromo_layers
+        cor_source = max(sc[1] - corona_base, 0)
+        cor_copy = min(cor_target, cor_source)
+        if cor_copy > 0:
+            Bx[chromo_layers : chromo_layers + cor_copy, :, :] = bcube[0, corona_base : corona_base + cor_copy, :, :]
+            By[chromo_layers : chromo_layers + cor_copy, :, :] = bcube[1, corona_base : corona_base + cor_copy, :, :]
+            Bz[chromo_layers : chromo_layers + cor_copy, :, :] = bcube[2, corona_base : corona_base + cor_copy, :, :]
     
         chr_s  = (chromo_layers,  Ny, Nx)
         cor_s  = (sc[1]-corona_base, Ny, Nx)
@@ -322,7 +621,18 @@ class GXRadioImageComputing:
 
         chromo_mask = model_dict["chromo_mask"].copy()
 
-        voxel_id_xyz = gx_box2id(model_dict)
+        voxel_box = {
+            "bcube": model_dict["bcube"],
+            "dr": model_dict["dr"],
+            "chromo_layers": chromo_layers,
+            "corona_base": corona_base,
+            "chromo_idx": model_dict.get("chromo_idx"),
+            "chromo_t": model_dict.get("chromo_t"),
+            "chromo_n": model_dict.get("chromo_n"),
+        }
+        if "start_idx" in model_dict:
+            voxel_box["start_idx"] = model_dict["start_idx"]
+        voxel_id_xyz = gx_box2id(voxel_box)
         if voxel_id_xyz is None:
             VoxelID = np.zeros(s, dtype=np.uint8)
         else:

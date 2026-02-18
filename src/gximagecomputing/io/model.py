@@ -33,6 +33,43 @@ def _extract_from_execute(execute_text: str):
     return dims, dx_km
 
 
+def extract_center_from_execute(execute_text: str) -> tuple[float, float] | None:
+    # Python CLI style: --coords X Y
+    m_coords = re.search(
+        r"(?:^|\s)--coords(?:\s+|=)([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s+([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)",
+        execute_text,
+    )
+    if m_coords:
+        return float(m_coords.group(1)), float(m_coords.group(2))
+
+    # Legacy IDL execute style: CENTER_ARCSEC=[ X, Y ]
+    m_center = re.search(
+        r"CENTER_ARCSEC\s*=\s*\[\s*([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*,\s*([+-]?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\s*\]",
+        execute_text,
+        flags=re.IGNORECASE,
+    )
+    if m_center:
+        return float(m_center.group(1)), float(m_center.group(2))
+    return None
+
+
+def infer_center_from_execute(loader_name: str, model_path: Path) -> tuple[float, float] | None:
+    execute_text = None
+    if loader_name == "h5":
+        with h5py.File(model_path, "r") as f:
+            if "metadata" in f and "execute" in f["metadata"]:
+                execute_text = decode_if_bytes(f["metadata"]["execute"][()])
+    else:
+        data = io.readsav(str(model_path))
+        box = data.box
+        if "EXECUTE" in box.dtype.names:
+            execute_text = decode_if_bytes(box.execute[0])
+
+    if not execute_text:
+        return None
+    return extract_center_from_execute(str(execute_text))
+
+
 def infer_fov_from_execute(
     loader_name: str,
     model_path: Path,

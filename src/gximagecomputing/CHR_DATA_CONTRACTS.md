@@ -21,14 +21,20 @@ Metadata source:
 
 Entry point: `GXRadioImageComputing.load_model_hdf(path)`
 
-Expected datasets:
-- `/chromo/dr`, `/chromo/dz`
-- `/chromo/bcube`, `/chromo/chromo_bcube`
-- `/chromo/chromo_layers`, `/chromo/corona_base`
+Expected datasets (v0.2.0 canonical):
+- `/corona/dr`, `/corona/corona_base`
+- `/corona/bx`, `/corona/by`, `/corona/bz` (or legacy packed `/corona/bcube`)
+- `/chromo/dz`, `/chromo/chromo_layers`
 - `/chromo/chromo_idx`, `/chromo/chromo_n`, `/chromo/n_p`, `/chromo/n_hi`, `/chromo/chromo_t`
-- `/chromo/av_field`, `/chromo/phys_length`, `/chromo/voxel_status`
-- `/chromo/start_idx`, `/chromo/end_idx`
+- `/chromo/bx`, `/chromo/by`, `/chromo/bz` (or legacy packed `/chromo/chromo_bcube`)
+- `/lines/av_field`, `/lines/phys_length`, `/lines/voxel_status`
+- `/lines/start_idx`, `/lines/end_idx`
 - `/chromo/chromo_mask` (fallback: `/base/chromo_mask`)
+
+Legacy-compatible fallbacks still supported:
+- `/chromo/dr`, `/chromo/corona_base`
+- `/chromo/bcube`
+- line metadata under `/chromo/*` (`av_field`, `phys_length`, `voxel_status`, `start_idx`, `end_idx`)
 
 Metadata source:
 - `/chromo` attributes: `lon`, `lat`, `dsun_obs`, `obs_time`

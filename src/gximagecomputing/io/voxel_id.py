@@ -95,12 +95,22 @@ def _normalize_box_for_id(box):
         return box
     chromo = box.get("chromo", {}) if isinstance(box.get("chromo", {}), dict) else {}
     corona = box.get("corona", {}) if isinstance(box.get("corona", {}), dict) else {}
+    lines = box.get("lines", {}) if isinstance(box.get("lines", {}), dict) else {}
     merged = {}
-    for key in ("bx", "by", "bz", "Bx", "By", "Bz", "bcube", "dr", "start_idx", "startidx"):
+    for key in ("bx", "by", "bz", "Bx", "By", "Bz", "bcube", "dr"):
         if key in corona:
             merged[key] = corona[key]
+    for key in ("start_idx", "startidx"):
+        if key in lines:
+            merged[key] = lines[key]
     for key in ("chromo_idx", "chromo_t", "chromo_n", "chromo_layers", "corona_base"):
         if key in chromo:
+            merged[key] = chromo[key]
+    for key in ("chromo_layers", "corona_base"):
+        if key in corona and key not in merged:
+            merged[key] = corona[key]
+    for key in ("start_idx", "startidx"):
+        if key in chromo and key not in merged:
             merged[key] = chromo[key]
     for key in (
         "bx",

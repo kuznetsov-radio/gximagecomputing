@@ -12,7 +12,7 @@ from astropy.time import Time
 
 from gximagecomputing.io.ebtel import resolve_ebtel_path
 from gximagecomputing.io.maps_h5 import save_h5_maps
-from gximagecomputing.io.model import estimate_hpc_center, infer_fov_from_execute
+from gximagecomputing.io.model import estimate_hpc_center, infer_center_from_execute, infer_fov_from_execute
 
 
 # .../gximagecomputing/src/gximagecomputing/workflows/render_mw.py -> repo root at parents[3]
@@ -97,7 +97,12 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Render MW maps from a single H5/SAV CHR model.")
     p.add_argument("--model-path", type=Path, required=True, help="Path to input CHR model (.h5 or .sav).")
     p.add_argument("--model-format", choices=["h5", "sav", "auto"], default="auto")
-    p.add_argument("--ebtel-path", type=Path, default=None)
+    p.add_argument(
+        "--ebtel-path",
+        type=Path,
+        default=None,
+        help="Optional EBTEL table (.sav). If omitted, DEM/heating tables are disabled.",
+    )
     p.add_argument("--output-dir", type=Path, default=DEFAULT_OUTDIR)
     p.add_argument(
         "--output-name",
@@ -139,15 +144,26 @@ def run(args: argparse.Namespace) -> None:
         loader = args.model_format
 
     gxi = gximagecomputing.GXRadioImageComputing()
-    ebtel_path = resolve_ebtel_path(args.ebtel_path)
-    ebtel_c, ebtel_dt = gxi.load_ebtel(str(ebtel_path))
+    ebtel_env = os.environ.get("GXIMAGECOMPUTING_EBTEL_PATH", "").strip()
+    if args.ebtel_path is None and not ebtel_env:
+        ebtel_path = ""
+        ebtel_c, ebtel_dt = gxi.load_ebtel_none()
+    else:
+        ebtel_path = str(resolve_ebtel_path(args.ebtel_path))
+        ebtel_c, ebtel_dt = gxi.load_ebtel(ebtel_path)
 
     if loader == "h5":
         model, model_dt = gxi.load_model_hdf(str(model_path))
     else:
         model, model_dt = gxi.load_model_sav(str(model_path))
 
-    xc_auto, yc_auto = estimate_hpc_center(model)
+    center_exec = infer_center_from_execute(loader_name=loader, model_path=model_path)
+    if center_exec is not None:
+        xc_auto, yc_auto = float(center_exec[0]), float(center_exec[1])
+        center_source = "execute"
+    else:
+        xc_auto, yc_auto = estimate_hpc_center(model)
+        center_source = "lonC/latC"
     model_w_arcsec, model_h_arcsec = infer_fov_from_execute(
         loader_name=loader,
         model_path=model_path,
@@ -269,8 +285,12 @@ def run(args: argparse.Namespace) -> None:
     save_preview(result, preview_path, title=model_path.stem, freqlist=freqlist, obs_time_iso=obs_time_iso)
 
     print(f"Using library: {gxi.libname}")
-    print(f"Using EBTEL: {ebtel_path}")
+    if ebtel_path:
+        print(f"Using EBTEL: {ebtel_path}")
+    else:
+        print("Using EBTEL: none (DEM/heating tables disabled; isothermal/hydrostatic fallback)")
     print(f"Model: {model_path} ({loader})")
+    print(f"Center source: {center_source}")
     print(f"Center used: xc={xc:.3f}, yc={yc:.3f} arcsec")
     print(f"FOV={fov_x:.2f}x{fov_y:.2f} arcsec; N={nx}x{ny}; dx={dx:.2f}, dy={dy:.2f} arcsec")
     print("Outputs:")
