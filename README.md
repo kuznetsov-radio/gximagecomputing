@@ -2,6 +2,26 @@
 
 This code computes 2D maps of the solar microwave (gyroresonance and free-free) and EUV (spectral lines) emission, using models of active regions created by the [**GX Simulator**](https://github.com/Gelu-Nita/GX_SIMULATOR/) (requires SolarSoft GX_Simulator package).
 
+[![Build And Publish Wheels](https://github.com/kuznetsov-radio/gximagecomputing/actions/workflows/build_wheels.yml/badge.svg)](https://github.com/kuznetsov-radio/gximagecomputing/actions/workflows/build_wheels.yml)
+
+----
+
+## PyPI Package Name
+
+PyPI distribution name: `pyGXrender`
+
+Python import package remains:
+
+```python
+import gximagecomputing
+```
+
+Install from PyPI:
+
+```bash
+pip install pyGXrender
+```
+
 ----
 
 ## Quick Start
@@ -10,9 +30,231 @@ See the example files:
 
 - `./examples/RenderExampleMW.pro`
 - `./examples/RenderExampleEUV.pro`
-- `./examples/RenderExample.py`
+- `./examples/RenderExampleMW.py`
 
 **Note:** Sample GX Simulator model and EBTEL data are not included.
+
+----
+
+## Python Environment Notes
+
+### Imports (`PYTHONPATH`)
+
+If running scripts directly from the repository checkout (without installing the package), add `src` to `PYTHONPATH`:
+
+```bash
+PYTHONPATH=src python examples/RenderExampleMW.py --help
+```
+
+If installed with pip, this is usually not needed:
+
+```bash
+pip install .
+```
+
+### Writable Config/Cache Directories (SunPy/Matplotlib)
+
+Some environments have non-writable default user config/cache folders. In that case, use writable overrides:
+
+```bash
+SUNPY_CONFIGDIR=/tmp/sunpy_cfg MPLCONFIGDIR=/tmp/mpl_cfg python examples/RenderExampleMW.py --help
+```
+
+If needed, create those folders first:
+
+```bash
+mkdir -p /tmp/sunpy_cfg /tmp/mpl_cfg
+```
+
+This avoids runtime errors such as:
+- `Could not write to SUNPY_CONFIGDIR=...`
+- Matplotlib/fontconfig cache permission warnings
+
+### EBTEL Table Path (`GXIMAGECOMPUTING_EBTEL_PATH`)
+
+EBTEL is optional. If no EBTEL path is provided, DEM/DDM and heating tables are not used (legacy behavior: isothermal/hydrostatic fallback in the native library).
+
+If you want to use EBTEL tables, pass `--ebtel-path` explicitly or set one environment variable once per shell session:
+
+```bash
+export GXIMAGECOMPUTING_EBTEL_PATH="$SSW/packages/gx_simulator/euv/ebtel/ebtel_ss.sav"
+```
+
+If your SolarSoft installation does not define `$SSW`, use an absolute path:
+
+```bash
+export GXIMAGECOMPUTING_EBTEL_PATH="/full/path/to/ssw/packages/gx_simulator/euv/ebtel/ebtel_ss.sav"
+```
+
+Then run:
+
+```bash
+python examples/RenderExampleMW.py --model-path /path/to/your.chr.sav --model-format auto
+```
+
+### MW Rendering: CLI and Programmatic Usage
+
+If you installed the package (`pip install .` or `pip install -e .`), use the
+installed CLI:
+
+```bash
+gxrender-mw \
+  --model-path /path/to/your.chr.h5 \
+  --output-dir /tmp \
+  --output-format h5
+```
+
+Optional EBTEL-enabled run:
+
+```bash
+gxrender-mw \
+  --model-path /path/to/your.chr.h5 \
+  --ebtel-path /full/path/to/ebtel_ss.sav \
+  --output-dir /tmp \
+  --output-format h5
+```
+
+You can also call the same workflow from Python:
+
+```python
+from argparse import Namespace
+from gximagecomputing.workflows.render_mw import run
+
+args = Namespace(
+    model_path="/path/to/your.chr.h5",
+    model_format="auto",
+    ebtel_path=None,
+    output_dir="/tmp",
+    output_name=None,
+    output_format="h5",
+    omp_threads=None,
+    xc=None,
+    yc=None,
+    dx=2.0,
+    dy=2.0,
+    pixel_scale_arcsec=None,
+    nx=None,
+    ny=None,
+    xrange=None,
+    yrange=None,
+)
+run(args)
+```
+
+### MW Map Viewer GUI
+
+Open a rendered MW maps HDF5 file (`[nx, ny, nf, 2]`) with the interactive viewer:
+
+```bash
+gxrender-map-view /path/to/your_mw_maps.h5
+```
+
+Example:
+
+```bash
+gxrender-map-view /tmp/test.chr.h5_py_mw_maps.h5
+```
+
+Optional: start from a specific frequency index:
+
+```bash
+gxrender-map-view /tmp/test.chr.h5_py_mw_maps.h5 --start-index 0
+```
+
+----
+
+## Python Data Branches (Non-Interfering)
+
+The Python API now treats CHR inputs as two explicit branches that both normalize to the same internal `ChromoModel` representation consumed by the rendering library:
+
+- **IDL branch**: `load_model_sav(...)` for GX Simulator `.sav` CHR models.
+- **pyAMPP branch**: `load_model_hdf(...)` for current pyAMPP `.h5` CHR models (`/chromo` group).
+
+Both branches are converted into one internal data layout before calling the native renderer, so loader-specific format changes do not leak into rendering logic.
+
+### Native SAV -> HDF5 Conversion (No pyAMPP Dependency)
+
+Use the built-in CLI to convert a GX CHR `.sav` model into canonical HDF5:
+
+```bash
+gx-sav2h5 \
+  --sav-path /path/to/input.NAS.CHR.sav \
+  --out-h5 /path/to/output.NAS.CHR.h5
+```
+
+Optional: seed from an existing HDF5 template while still rewriting model groups:
+
+```bash
+gx-sav2h5 \
+  --sav-path /path/to/input.NAS.CHR.sav \
+  --out-h5 /path/to/output.NAS.CHR.h5 \
+  --template-h5 /path/to/template.h5
+```
+
+### One-Command SAV↔H5 Parity Check
+
+Run strict regression parity (rebuild H5 from SAV, then compare loader outputs field-by-field):
+
+```bash
+make parity-roundtrip
+```
+
+Defaults:
+- `SAV_PATH=test_data/test.chr.sav`
+- `H5_PATH=test_data/test.chr.h5`
+- `ATOL=0`, `RTOL=0`
+
+Override example:
+
+```bash
+make parity-roundtrip \
+  SAV_PATH=/path/to/model.NAS.CHR.sav \
+  H5_PATH=/tmp/model.NAS.CHR.h5
+```
+
+If your `test_data` is under Dropbox/iCloud and file locking interferes, prefer a temporary output file:
+
+```bash
+make parity-roundtrip H5_PATH=/tmp/test.chr.h5
+```
+
+----
+
+## Building Native Library (Linux/macOS)
+
+The `source/makefile` supports platform-aware builds and copies outputs into `./binaries`.
+
+### Build
+
+```bash
+cd source
+make
+```
+
+### Outputs
+
+- Linux: `binaries/RenderGRFF.so`
+- macOS arm64: `binaries/RenderGRFF_arm64.so`
+- macOS x86_64: `binaries/RenderGRFF_x86_64.so`
+
+### macOS prerequisites
+
+Install OpenMP runtime (Homebrew):
+
+```bash
+brew install libomp
+```
+
+If Homebrew is in a non-default prefix, set include/link flags explicitly:
+
+```bash
+make CPPFLAGS='-I/opt/homebrew/opt/libomp/include' LDFLAGS='-L/opt/homebrew/opt/libomp/lib'
+```
+
+### Binary Wheel Releases
+
+For maintainers: release process and exact publish commands are documented in `RELEASING.md`.
+CI workflow: `.github/workflows/build_wheels.yml`
 
 ----
 
