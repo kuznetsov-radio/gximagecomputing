@@ -1,17 +1,12 @@
 function LoadGXmodel__load_box, infile
  inlower=strlowcase(string(infile))
- nch=strlen(inlower)
- ext3=''
- ext4=''
- ext5=''
- if nch ge 3 then ext3=strmid(inlower, nch-3, 3)
- if nch ge 4 then ext4=strmid(inlower, nch-4, 4)
- if nch ge 5 then ext5=strmid(inlower, nch-5, 5)
- if (ext4 eq '.sav') or (ext4 eq '.xdr') then begin
+ ext=strsplit(inlower, '.', /extract)
+ ext=ext[-1]
+ if (ext eq 'sav') or (ext eq 'xdr') then begin
   restore, infile
   return, box
  endif
- if (ext3 eq '.h5') or (ext5 eq '.hdf5') then begin
+ if (ext eq 'h5') or (ext eq 'hdf5') then begin
   resolve_routine, 'ConvertToGX', /either
   return, ConvertToGX(infile)
  endif
@@ -42,9 +37,9 @@ function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime
   endelse
 
   ; Fallback to direct heliographic tags when WCS parsing is unavailable.
-  if tag_exist(box.index, 'HGLN_OBS') then lonC=double(box.index.hgln_obs) $
-  else if tag_exist(box.index, 'CRVAL1') then lonC=double(box.index.crval1)
-  if tag_exist(box.index, 'CRVAL2') then latC=double(box.index.crval2)
+;  if tag_exist(box.index, 'HGLN_OBS') then lonC=double(box.index.hgln_obs) $
+;  else if tag_exist(box.index, 'CRVAL1') then lonC=double(box.index.crval1)
+;  if tag_exist(box.index, 'CRVAL2') then latC=double(box.index.crval2)
  endif
 
  if exist(newTime) then begin
@@ -57,8 +52,8 @@ function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime
  a=get_sun(anytim(obsTime, /ex))
  DSun=a[0]*1.495978707d13
  b0Sun=a[11]
- if tag_exist(box, 'INDEX') and tag_exist(box.index, 'DSUN_OBS') then DSun=double(box.index.dsun_obs)
- if tag_exist(box, 'INDEX') and tag_exist(box.index, 'SOLAR_B0') then b0Sun=double(box.index.solar_b0)
+; if tag_exist(box, 'INDEX') and tag_exist(box.index, 'DSUN_OBS') then DSun=double(box.index.dsun_obs)
+; if tag_exist(box, 'INDEX') and tag_exist(box.index, 'SOLAR_B0') then b0Sun=double(box.index.solar_b0)
  ; pyAMPP HDF5 index stores DSUN_OBS in meters; RenderGRFF expects centimeters.
  ; Keep backward compatibility with legacy SAV values already in centimeters.
  if DSun lt 1d12 then DSun=DSun*100d
