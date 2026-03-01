@@ -12,3 +12,6 @@ src/gximagecomputing/RenderGRFF*.dll
 # Local validation data (large; keep outside git history)
 test_data/
 .DS_Store
+
+# Sphinx build output
+docs/_build/

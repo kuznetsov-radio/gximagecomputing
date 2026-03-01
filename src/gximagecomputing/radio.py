@@ -15,6 +15,12 @@ from pathlib import Path
 from dataclasses import dataclass
 from typing import Any, Dict
 from .io.voxel_id import gx_box2id
+from .io.ebtel import load_ebtel as io_load_ebtel, load_ebtel_none as io_load_ebtel_none
+from .io.model import (
+    load_model_dict as io_load_model_dict,
+    load_model_hdf as io_load_model_hdf,
+    load_model_sav as io_load_model_sav,
+)
 
 
 class GXRadioImageComputing:
@@ -34,6 +40,7 @@ class GXRadioImageComputing:
                 "Could not load any RenderGRFF library candidate. "
                 f"Tried: {[str(c) for c in candidates]}"
             ) from last_error
+        self._lib = libc_mw
 
         self.mwfunc=libc_mw.pyComputeMW
         self.mwfunc.restype=ctypes.c_int
@@ -271,82 +278,16 @@ class GXRadioImageComputing:
                 )
                 if mds:
                     header["dsun_obs"] = float(mds.group(1))
-        if "lonC" not in header:
-            hglon = _extract_fits_card("HGLN_OBS")
-            if hglon is not None:
-                try:
-                    header["lonC"] = float(hglon)
-                except ValueError:
-                    pass
+        # Do not infer lonC from index fallback tags (HGLN_OBS/CRVAL1).
+        # Keep lonC derived from coordinate transforms in load_model_dict,
+        # unless an explicit lonC override is provided by higher-level callers.
 
     def load_ebtel(self, ebtel_file):
-        ebtel_data = io.readsav(ebtel_file)
-        s = ebtel_data["lrun"].shape
-    
-        ebtel_dtypes = [("DEM_on", np.int32),
-                        ("DDM_on", np.int32),
-                        ("NQ", np.int32),
-                        ("NL", np.int32),
-                        ("NT", np.int32),
-                        ("Qrun", np.float32, ebtel_data["qrun"].shape),
-                        ("Lrun", np.float32, ebtel_data["lrun"].shape),
-                        ("logtdem", np.float32, ebtel_data["logtdem"].size)
-                      ]
-        if "dem_cor_run" in ebtel_data.keys():
-            ebtel_dtypes.append(("DEM_cor_run", np.float32, ebtel_data["dem_cor_run"].shape))
-        
-        if "ddm_cor_run" in ebtel_data.keys():
-            ebtel_dtypes.append(("DDM_cor_run", np.float32, ebtel_data["ddm_cor_run"].shape))
-        
-        ebtel_dt = np.dtype(ebtel_dtypes)
-        ebtel_c = np.zeros(1, dtype=ebtel_dt)
-        
-        ebtel_c["DEM_on"] = 1 if "dem_cor_run" in ebtel_data.keys() else 0
-        ebtel_c["DDM_on"] = 1 if "ddm_cor_run" in ebtel_data.keys() else 0
-        # Python/C ABI in this project expects NQ/NL in this order.
-        # (Swapping to match IDL helper text causes large rendering mismatch.)
-        ebtel_c["NQ"] = s[1]
-        ebtel_c["NL"] = s[0]
-        ebtel_c["NT"] = ebtel_data["logtdem"].size
-        ebtel_c["Qrun"] = np.float32(ebtel_data["qrun"])
-        ebtel_c["Lrun"] = np.float32(ebtel_data["lrun"])
-        ebtel_c["logtdem"] = np.float32(ebtel_data["logtdem"])
-        
-        if "dem_cor_run" in ebtel_data.keys():
-            ebtel_c["DEM_cor_run"] = np.float32(ebtel_data["DEM_cor_run"])
-        
-        if "ddm_cor_run" in ebtel_data.keys():
-            ebtel_c["DDM_cor_run"] = np.float32(ebtel_data["DDM_cor_run"])
-        
-        return ebtel_c, ebtel_dt
+        return io_load_ebtel(ebtel_file)
 
     @staticmethod
     def load_ebtel_none():
-        """Return a minimal EBTEL struct with DEM/DDM disabled.
-
-        This matches the legacy IDL behavior for ebtelfile='':
-        heating tables are not used and the native library falls back to
-        isothermal/hydrostatic coronal plasma handling.
-        """
-        ebtel_dt = np.dtype(
-            [
-                ("DEM_on", np.int32),
-                ("DDM_on", np.int32),
-                ("NQ", np.int32),
-                ("NL", np.int32),
-                ("NT", np.int32),
-                ("Qrun", np.float32, (1, 1)),
-                ("Lrun", np.float32, (1, 1)),
-                ("logtdem", np.float32, (1,)),
-            ]
-        )
-        ebtel_c = np.zeros(1, dtype=ebtel_dt)
-        ebtel_c["DEM_on"] = 0
-        ebtel_c["DDM_on"] = 0
-        ebtel_c["NQ"] = 1
-        ebtel_c["NL"] = 1
-        ebtel_c["NT"] = 1
-        return ebtel_c, ebtel_dt
+        return io_load_ebtel_none()
 
     @dataclass
     class ChromoModelData:
@@ -407,12 +348,7 @@ class GXRadioImageComputing:
 
             if "chromo_mask" not in model_dict and "base" in model_f and "chromo_mask" in model_f["base"]:
                 model_dict["chromo_mask"] = model_f["base"]["chromo_mask"][:]
-            if "base" in model_f and "wcs_header" in model_f["base"]:
-                wcs_raw = self._decode_if_bytes(model_f["base"]["wcs_header"][()])
-                if isinstance(wcs_raw, str):
-                    m_lonc = re.search(r"CRVAL1\s*=\s*([+-]?\d+(?:\.\d+)?)", wcs_raw)
-                    if m_lonc:
-                        header["lonC"] = float(m_lonc.group(1))
+            # Keep lonC computation centralized in load_model_dict unless explicitly overridden.
             # Fallback metadata if chromo attrs are incomplete.
             if "corona" in model_f:
                 for key, value in dict(model_f["corona"].attrs).items():
@@ -469,7 +405,7 @@ class GXRadioImageComputing:
                 + ", ".join(missing)
             )
 
-        required_header = ("lon", "lat", "dsun_obs", "obs_time")
+        required_header = ("lon", "lat", "obs_time")
         missing_header = [k for k in required_header if k not in header]
         if missing_header:
             raise KeyError(
@@ -490,11 +426,8 @@ class GXRadioImageComputing:
             "dsun_obs": box.index[0]["DSUN_OBS"][0],
             "obs_time": aptime,
         }
-        # IDL LoadGXmodel derives model lonC via WCS conversion. For CEA SAV
-        # files this is provided directly in INDEX/HGLN_OBS and gives better
-        # parity with IDL than recomputing from Carrington->Stonyhurst.
-        if "HGLN_OBS" in box.index[0].dtype.names:
-            header["lonC"] = float(box.index[0]["HGLN_OBS"][0])
+        # Do not seed lonC directly from INDEX/HGLN_OBS here; keep model lonC
+        # derived in load_model_dict unless explicitly provided by caller.
 
         model_dict = {
             "dr": box.dr[0],
@@ -540,196 +473,13 @@ class GXRadioImageComputing:
         return self.ChromoModelData(header=header, model=model_dict)
     
     def load_model_dict(self, model_dict, header):
-        lon, lat, dsun_obs, obs_time = [header.get(k) for k in ("lon", "lat", "dsun_obs", "obs_time")]
-        obs_time = self._coerce_time(obs_time)
-        lonC_override = header.get("lonC", None)
-        b0sun_override = header.get("b0Sun", None)
-        dsun_override = header.get("DSun", None)
-        init_coords = SkyCoord(lon*u.deg, lat*u.deg, frame=frames.HeliographicCarrington,rsun=696000*u.km,\
-                       obstime=obs_time, observer="earth")
-        hgs = init_coords.transform_to(frames.HeliographicStonyhurst)
-        obstime = obs_time.unix - 283996800 # according to IDL specs, anytim function
-
-        DSun = dsun_obs*1e2 if dsun_override is None else float(dsun_override)
-        RSun = init_coords.rsun.to(u.cm).value
-        b0Sun = sun.B0(obs_time).value if b0sun_override is None else float(b0sun_override)
-
-        lonC = hgs.lon.to(u.deg).value if lonC_override is None else float(lonC_override)
-        latC=lat
-
-        dr = model_dict["dr"]
-
-        dx=dr[0]*RSun
-        dy=dr[1]*RSun
-        dz_uniform=dr[2]*RSun
-        dz=model_dict["dz"].T*RSun
-
-        s = dz.shape
-        sc = model_dict["bcube"].T.shape
-        
-        Nx=s[2]
-        Ny=s[1]
-        Nz=s[0]
-    
-        chromo_layers=model_dict["chromo_layers"]
-        corona_layers=Nz-chromo_layers
-        corona_base=model_dict["corona_base"]
-
-        # Some pyAMPP products can have a 1-layer discrepancy between
-        # chromo_layers and corona_base metadata. Align corona_base so the
-        # stitched volume dimensions remain consistent with dz/Nz.
-        expected_corona_base = int(sc[1] - (Nz - chromo_layers))
-        if (sc[1] - int(corona_base)) != (Nz - chromo_layers):
-            if 0 <= expected_corona_base < sc[1]:
-                corona_base = expected_corona_base
-            else:
-                corona_base = int(np.clip(corona_base, 0, max(sc[1] - 1, 0)))
-    
-        Bx=np.zeros(s, dtype=np.float32, order="C")
-        By=np.zeros(s, dtype=np.float32, order="C")
-        Bz=np.zeros(s, dtype=np.float32, order="C")
-    
-        chromo_bcube = model_dict["chromo_bcube"].T
-        bcube = model_dict["bcube"].T
-    
-        Bx[0:chromo_layers, :, :]=chromo_bcube[0, :, :, :]
-        By[0:chromo_layers, :, :]=chromo_bcube[1, :, :, :]
-        Bz[0:chromo_layers, :, :]=chromo_bcube[2, :, :, :]
-    
-        cor_target = Nz - chromo_layers
-        cor_source = max(sc[1] - corona_base, 0)
-        cor_copy = min(cor_target, cor_source)
-        if cor_copy > 0:
-            Bx[chromo_layers : chromo_layers + cor_copy, :, :] = bcube[0, corona_base : corona_base + cor_copy, :, :]
-            By[chromo_layers : chromo_layers + cor_copy, :, :] = bcube[1, corona_base : corona_base + cor_copy, :, :]
-            Bz[chromo_layers : chromo_layers + cor_copy, :, :] = bcube[2, corona_base : corona_base + cor_copy, :, :]
-    
-        chr_s  = (chromo_layers,  Ny, Nx)
-        cor_s  = (sc[1]-corona_base, Ny, Nx)
-        cor_s2 = (corona_base,    Ny, Nx)
-    
-        chromo_n0 =np.zeros(chr_s)
-        chromo_np =np.zeros(chr_s)
-        chromo_nHI=np.zeros(chr_s)
-        chromo_T0 =np.zeros(chr_s)
-
-        chromo_idx = model_dict["chromo_idx"]
-        chromo_n0.flat[chromo_idx] = model_dict["chromo_n"]
-        chromo_np.flat[chromo_idx] = model_dict["n_p"]
-        chromo_nHI.flat[chromo_idx]= model_dict["n_hi"]
-        chromo_T0.flat[chromo_idx] = model_dict["chromo_t"]
-
-        chromo_mask = model_dict["chromo_mask"].copy()
-
-        voxel_box = {
-            "bcube": model_dict["bcube"],
-            "dr": model_dict["dr"],
-            "chromo_layers": chromo_layers,
-            "corona_base": corona_base,
-            "chromo_idx": model_dict.get("chromo_idx"),
-            "chromo_t": model_dict.get("chromo_t"),
-            "chromo_n": model_dict.get("chromo_n"),
-        }
-        if "start_idx" in model_dict:
-            voxel_box["start_idx"] = model_dict["start_idx"]
-        voxel_id_xyz = gx_box2id(voxel_box)
-        if voxel_id_xyz is None:
-            VoxelID = np.zeros(s, dtype=np.uint8)
-        else:
-            # gx_box2id returns (nx, ny, nz); renderer struct stores (nz, ny, nx).
-            VoxelID = np.asarray(voxel_id_xyz, dtype=np.uint8).transpose((2, 1, 0))
-        startidx, endidx = self._sanitize_status_mask(model_dict["start_idx"], model_dict["end_idx"], chromo_mask)
-
-        # Match IDL linear indexing semantics used in LoadGXmodel.pro:
-        # ID1=byte(chromo_mask[startidx]), ID2=byte(chromo_mask[endidx]).
-        # Under this pipeline the equivalent is C-order flattened indexing.
-        chromo_mask_flat = np.asarray(chromo_mask).ravel(order="C")
-        ID1 = chromo_mask_flat[startidx]
-        ID2 = chromo_mask_flat[endidx]
-
-        QB = np.asarray(model_dict["av_field"], dtype=np.float64).reshape(-1)
-        QL = np.asarray(model_dict["phys_length"], dtype=np.float64).reshape(-1) * RSun
-        uu = np.asarray(model_dict["voxel_status"], dtype=np.uint8).reshape(-1)
-
-        QB[ (uu & 4) != 4] = 0
-        QL[ (uu & 4) != 4] = 0
-        ID1[(uu & 4) != 4] = 0
-        ID2[(uu & 4) != 4] = 0
-
-        QB   = QB.reshape((Nx, Ny, sc[1]), order="F")
-        QL   = QL.reshape((Nx, Ny, sc[1]), order="F")
-        ID1   = ID1.reshape((Nx, Ny, sc[1]), order="F")
-        ID2   = ID2.reshape((Nx, Ny, sc[1]), order="F")
-
-        corona_Bavg         = QB[:, :, corona_base : sc[1]].T
-        chromo_uniform_Bavg = QB[:, :, 0 : corona_base].T
-
-        corona_L         = QL[:, :, corona_base : sc[1]].T
-        chromo_uniform_L = QL[:, :, 0 : corona_base].T
-
-        corona_ID1 = ID1[:, :, corona_base : sc[1]].T
-        corona_ID2 = ID2[:, :, corona_base : sc[1]].T
-
-        chromo_uniform_ID1 = ID1[:, :, 0 : corona_base].T
-        chromo_uniform_ID2 = ID2[:, :, 0 : corona_base].T
-
-        #pdb.set_trace()
-
-        model_dt_varlist = [
-                ('Nx', np.int32),
-                ('Ny', np.int32),
-                ('Nz', np.int32),
-                ('chromo_layers', np.int32),
-                ('corona_layers', np.int32),
-                ('corona_base',   np.int32),
-                ('DSun', np.float64),
-                ('RSun', np.float64),
-                ('b0Sun', np.float64),
-                ('lonC', np.float64),
-                ('latC', np.float64),
-                ('dx',   np.float64),
-                ('dy',   np.float64),
-                ('dz_uniform', np.float64),
-                ('obstime',    np.float64),
-                ('dz', np.float32, s),
-                ('Bx', np.float32, s),
-                ('By', np.float32, s),
-                ('Bz', np.float32, s),
-                ('chromo_n0' ,  np.float32, chr_s),
-                ('chromo_np' ,  np.float32, chr_s),
-                ('chromo_nHI',  np.float32, chr_s),
-                ('chromo_T0',   np.float32, chr_s),
-                ('corona_Bavg', np.float32, cor_s),
-                ('corona_L',    np.float32, cor_s),
-                ('chromo_uniform_Bavg', np.float32, cor_s2),
-                ('chromo_uniform_L',    np.float32, cor_s2),
-                ('VoxelID',            np.byte, s),
-                ('corona_ID1',         np.byte, cor_s),
-                ('corona_ID2',         np.byte, cor_s),
-                ('chromo_uniform_ID1', np.byte, cor_s2),
-                ('chromo_uniform_ID2', np.byte, cor_s2)
-        ]
-
-        model_dt = np.dtype(model_dt_varlist)
-        model = np.zeros(1, dtype=model_dt)
-
-        for vars in model_dt_varlist:
-            k, dt = vars[0], vars[1]
-            val = dt(locals()[k])
-            if len(val.shape) > 1:
-                model[k] = val.astype(dt, order="C")
-            else:
-                model[k] = val
-    
-        return model, model_dt
+        return io_load_model_dict(model_dict, header)
 
     def load_model_hdf(self, file_name):
-        data = self._build_hdf_chromo_data(file_name)
-        return self.load_model_dict(data.model, data.header)
+        return io_load_model_hdf(file_name)
 
     def load_model_sav(self, file_name):
-        data = self._build_sav_chromo_data(file_name)
-        return self.load_model_dict(data.model, data.header)
+        return io_load_model_sav(file_name)
 
     def synth_model(self, model, model_dt, ebtel, ebtel_dt, freqlist, box_Nx, box_Ny, box_xc, box_yc, box_dx, box_dy, Tbase, nbase, Q0, a, b, SHtable=None, rot=0, projection=0, mode=0):
         """

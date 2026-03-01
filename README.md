@@ -28,9 +28,27 @@ pip install pyGXrender
 
 See the example files:
 
-- `./examples/RenderExampleMW.pro`
-- `./examples/RenderExampleEUV.pro`
-- `./examples/RenderExampleMW.py`
+- `./examples/idl/RenderExampleMW.pro`
+- `./examples/idl/RenderExampleEUV.pro`
+- `./examples/python/cli/RenderExampleMW.py`
+
+Examples folder layout:
+
+```text
+examples/
+├── idl/
+│   ├── RenderExampleMW.pro
+│   ├── RenderExampleEUV.pro
+│   ├── InterpolateEBTELexample.pro
+│   └── compile_local_idl
+└── python/
+    ├── cli/
+    │   ├── RenderExampleMW.py
+    │   └── RenderExampleEUV.py
+    └── sdk/
+        ├── sdk_render_mw.py
+        └── sdk_render_euv.py
+```
 
 **Note:** Sample GX Simulator model and EBTEL data are not included.
 
@@ -43,7 +61,7 @@ See the example files:
 If running scripts directly from the repository checkout (without installing the package), add `src` to `PYTHONPATH`:
 
 ```bash
-PYTHONPATH=src python examples/RenderExampleMW.py --help
+PYTHONPATH=src python examples/python/cli/RenderExampleMW.py --help
 ```
 
 If installed with pip, this is usually not needed:
@@ -57,7 +75,7 @@ pip install .
 Some environments have non-writable default user config/cache folders. In that case, use writable overrides:
 
 ```bash
-SUNPY_CONFIGDIR=/tmp/sunpy_cfg MPLCONFIGDIR=/tmp/mpl_cfg python examples/RenderExampleMW.py --help
+SUNPY_CONFIGDIR=/tmp/sunpy_cfg MPLCONFIGDIR=/tmp/mpl_cfg python examples/python/cli/RenderExampleMW.py --help
 ```
 
 If needed, create those folders first:
@@ -69,6 +87,22 @@ mkdir -p /tmp/sunpy_cfg /tmp/mpl_cfg
 This avoids runtime errors such as:
 - `Could not write to SUNPY_CONFIGDIR=...`
 - Matplotlib/fontconfig cache permission warnings
+
+## Generated Docs (Sphinx, Optional)
+
+A lightweight Sphinx docs pipeline is available for generated API/reference
+pages (SDK, CLI workflow modules, viewer module).
+
+Build locally:
+
+```bash
+pip install -r docs/requirements.txt
+make docs-html
+```
+
+Open:
+
+- `docs/_build/html/index.html`
 
 ### EBTEL Table Path (`GXIMAGECOMPUTING_EBTEL_PATH`)
 
@@ -89,7 +123,7 @@ export GXIMAGECOMPUTING_EBTEL_PATH="/full/path/to/ssw/packages/gx_simulator/euv/
 Then run:
 
 ```bash
-python examples/RenderExampleMW.py --model-path /path/to/your.chr.sav --model-format auto
+python examples/python/cli/RenderExampleMW.py --model-path /path/to/your.chr.sav --model-format auto
 ```
 
 ### MW Rendering: CLI and Programmatic Usage
@@ -141,24 +175,199 @@ args = Namespace(
 run(args)
 ```
 
-### MW Map Viewer GUI
+### Professional SDK Usage (Programmatic, No CLI/argparse Coupling)
 
-Open a rendered MW maps HDF5 file (`[nx, ny, nf, 2]`) with the interactive viewer:
+For application integration, prefer the SDK layer in `gximagecomputing.sdk` (also re-exported at package root).
+This avoids `argparse.Namespace`-style calls and provides typed option objects for MW and EUV rendering.
 
-```bash
-gxrender-map-view /path/to/your_mw_maps.h5
+Available SDK entry points:
+
+- `gximagecomputing.render_mw_maps(...)`
+- `gximagecomputing.render_euv_maps(...)`
+- `gximagecomputing.MWRenderOptions`
+- `gximagecomputing.EUVRenderOptions`
+- `gximagecomputing.MapGeometry`
+- `gximagecomputing.ObserverOverrides`
+
+MW SDK example:
+
+```python
+from gximagecomputing import MapGeometry, MWRenderOptions, ObserverOverrides, render_mw_maps
+
+result = render_mw_maps(
+    MWRenderOptions(
+        model_path="/path/to/model.chr.sav",
+        model_format="sav",
+        ebtel_path="/path/to/ebtel.sav",
+        output_dir="/tmp/gxrender",
+        output_format="h5",
+        geometry=MapGeometry(dx=2.0, dy=2.0),
+        observer=ObserverOverrides(dsun_cm=None, lonc_deg=None, b0sun_deg=None),
+        save_outputs=False,   # in-memory workflow (no files written)
+        write_preview=False,  # ignored when save_outputs=False, but explicit is clearer
+        verbose=False,  # no CLI-style printing
+    )
+)
+
+print(result.outputs.h5_path)      # None (save_outputs=False)
+print(result.freqlist_ghz[:3])
+ti_cube = result.ti                # [ny, nx, nf]
+tv_cube = result.tv                # [ny, nx, nf]
+print(result.geometry.nx, result.geometry.ny)
 ```
 
-Example:
+EUV SDK example:
 
-```bash
-gxrender-map-view /tmp/test.chr.h5_py_mw_maps.h5
+```python
+from gximagecomputing import EUVRenderOptions, MapGeometry, ObserverOverrides, render_euv_maps
+
+result = render_euv_maps(
+    EUVRenderOptions(
+        model_path="/path/to/model.chr.sav",
+        model_format="sav",
+        ebtel_path="/path/to/ebtel.sav",
+        response_sav="/path/to/aia_response.sav",
+        output_dir="/tmp/gxrender",
+        geometry=MapGeometry(dx=2.0, dy=2.0),
+        observer=ObserverOverrides(
+            dsun_cm=14763359700479.328,
+            lonc_deg=-17.0574058213,
+            b0sun_deg=1.4406505929155138,
+        ),
+        save_outputs=False,
+        write_preview=False,
+        verbose=False,
+    )
+)
+
+print(result.outputs.h5_path)     # None (in-memory render)
+print(result.response.channels)
+flux_corona = result.flux_corona  # [ny, nx, nch]
+flux_tr = result.flux_tr          # [ny, nx, nch]
+print(result.outputs.save_outputs, result.outputs.write_preview)
 ```
 
-Optional: start from a specific frequency index:
+Notes:
+
+- The SDK reuses the same rendering engines as the CLI workflows, so CLI and SDK behavior stay aligned.
+- CLI entry points remain useful for quick tests and demonstrations.
+- The SDK returns typed dataclasses (`MWRenderResult`, `EUVRenderResult`) for a stronger contract than raw dictionaries.
+- Set `save_outputs=False` for fully in-memory rendering; set `write_preview=False` to skip preview PNG generation.
+- `write_preview` is only used when `save_outputs=True`.
+
+### Observer Metadata Overrides (MW and EUV, Python CLI)
+
+For parity/debugging workflows, both render CLIs support explicit overrides for
+observer/model metadata before calling the native DLL/shared library:
+
+- `--dsun-cm`
+- `--lonc-deg`
+- `--b0sun-deg`
+
+These overrides are applied before automatic center/FOV inference, so they also
+affect default `xc/yc` and FOV calculations unless you pass explicit map
+geometry (`--xc`, `--yc`, `--dx`, `--dy`, `--nx`, `--ny`, etc.).
+
+MW example:
 
 ```bash
-gxrender-map-view /tmp/test.chr.h5_py_mw_maps.h5 --start-index 0
+gxrender-mw \
+  --model-path /path/to/your.chr.sav \
+  --ebtel-path /path/to/ebtel.sav \
+  --dsun-cm 14763359700479.328 \
+  --lonc-deg -17.0574058213 \
+  --b0sun-deg 1.4406505929155138
+```
+
+EUV example:
+
+```bash
+python examples/python/cli/RenderExampleEUV.py \
+  --model-path /path/to/your.chr.sav \
+  --model-format sav \
+  --ebtel-path /path/to/ebtel.sav \
+  --response-sav /path/to/aia_response.sav \
+  --dsun-cm 14763359700479.328 \
+  --lonc-deg -17.0574058213 \
+  --b0sun-deg 1.4406505929155138
+```
+
+### Render Map Viewer GUI (`gxrender-map-view`)
+
+Interactive viewer for rendered MW and EUV map products.
+
+Supported input formats:
+
+- Python-rendered HDF5 map containers (`.h5`, `.hdf5`)
+  - MW schema: `maps/data` + `maps/freqlist_ghz`
+  - EUV schema: `maps/data` + `maps/channel_ids` (+ optional `maps/component_ids`)
+- IDL-rendered map containers (`.sav`, `.xdr`)
+  - Combined `map` containers
+  - EUV `mapcorona` / `maptr` style containers
+
+CLI usage:
+
+```bash
+gxrender-map-view /path/to/rendered_maps.h5
+```
+
+Optional initial index (frequency index for MW, channel index for EUV):
+
+```bash
+gxrender-map-view /path/to/rendered_maps.h5 --start-index 0
+```
+
+Examples:
+
+MW HDF5 output:
+
+```bash
+gxrender-map-view /tmp/gximagecomputing_validation_groundtruth/test.chr.sav_py_mw_maps.h5
+```
+
+EUV HDF5 output:
+
+```bash
+gxrender-map-view /tmp/gximagecomputing_validation_groundtruth/test.chr.sav_py_euv_maps.h5
+```
+
+IDL MW SAV output:
+
+```bash
+gxrender-map-view /tmp/gximagecomputing_validation_groundtruth/test.chr.sav_idl_mw_maps.sav
+```
+
+IDL EUV SAV output:
+
+```bash
+gxrender-map-view /tmp/gximagecomputing_validation_groundtruth/test.chr.sav_idl_euv_maps_forced_observer.sav
+```
+
+Viewer behavior:
+
+- Displays two synchronized panels (left/right components)
+  - MW: `TI` and `TV`
+  - EUV: `GX (TR)` and `GX (Corona)` (normalized to this order when possible)
+- Preserves WCS metadata when available from HDF5 `metadata/index_header`
+- Uses map-appropriate units
+  - MW: `K`
+  - EUV: `DN s^-1 pix^-1`
+- Replaces `NaN/Inf` pixels with `0` for robust display
+- Provides per-panel controls:
+  - intensity range slider
+  - log scaling toggle
+- Provides a shared axis slider:
+  - MW: frequency index
+  - EUV: channel index
+
+Notes:
+
+- For EUV HDF5 files, the slider moves across channels (e.g. `A94`, `A131`, ...)
+- For IDL SAV files, the viewer auto-detects MW vs EUV from map IDs
+- If your environment has restrictive config/cache permissions, set:
+
+```bash
+SUNPY_CONFIGDIR=/tmp/sunpy_cfg MPLCONFIGDIR=/tmp/mpl_cfg gxrender-map-view /path/to/rendered_maps.h5
 ```
 
 ----
@@ -191,32 +400,10 @@ gx-sav2h5 \
   --template-h5 /path/to/template.h5
 ```
 
-### One-Command SAV↔H5 Parity Check
+### Internal Validation Workflows
 
-Run strict regression parity (rebuild H5 from SAV, then compare loader outputs field-by-field):
-
-```bash
-make parity-roundtrip
-```
-
-Defaults:
-- `SAV_PATH=test_data/test.chr.sav`
-- `H5_PATH=test_data/test.chr.h5`
-- `ATOL=0`, `RTOL=0`
-
-Override example:
-
-```bash
-make parity-roundtrip \
-  SAV_PATH=/path/to/model.NAS.CHR.sav \
-  H5_PATH=/tmp/model.NAS.CHR.h5
-```
-
-If your `test_data` is under Dropbox/iCloud and file locking interferes, prefer a temporary output file:
-
-```bash
-make parity-roundtrip H5_PATH=/tmp/test.chr.h5
-```
+Repository-internal parity/regression procedures (including IDL/Python parity and
+comparison scripts under `tests/`) are documented in `tests/README.md`.
 
 ----
 
@@ -357,7 +544,7 @@ r = call_external(libname, 'ComputeMW', model, ebtel, simbox, coronaparms, outsp
 
 #### Example Usage
 
-See: `examples/RenderExampleMW.pro` (sample data not included).
+See: `examples/idl/RenderExampleMW.pro` (sample data not included).
 
 ----
 
@@ -455,7 +642,7 @@ r = call_external(libname, 'ComputeEUV', model, ebtel, response, simbox, coronap
 
 #### Example Usage
 
-See: `examples/RenderExampleEUV.pro` (sample data not included).
+See: `examples/idl/RenderExampleEUV.pro` (sample data not included).
 
 ----
 

@@ -2,28 +2,60 @@
 
 __all__ = [
     "resolve_ebtel_path",
+    "load_ebtel",
+    "load_ebtel_none",
     "save_h5_maps",
+    "save_h5_euv_maps",
     "build_h5_from_sav",
     "estimate_hpc_center",
+    "infer_center_from_execute",
     "infer_fov_from_execute",
+    "load_model_hdf",
+    "load_model_sav",
+    "load_model_dict",
     "gx_box2id",
     "gx_voxelid",
 ]
 
 
 def __getattr__(name):
-    if name == "resolve_ebtel_path":
-        from .ebtel import resolve_ebtel_path as _resolve_ebtel_path
+    if name in {"resolve_ebtel_path", "load_ebtel", "load_ebtel_none"}:
+        from .ebtel import resolve_ebtel_path, load_ebtel, load_ebtel_none
 
-        return _resolve_ebtel_path
-    if name == "save_h5_maps":
-        from .maps_h5 import save_h5_maps as _save_h5_maps
+        return {
+            "resolve_ebtel_path": resolve_ebtel_path,
+            "load_ebtel": load_ebtel,
+            "load_ebtel_none": load_ebtel_none,
+        }[name]
+    if name in {"save_h5_maps", "save_h5_euv_maps"}:
+        from .maps_h5 import save_h5_maps, save_h5_euv_maps
 
-        return _save_h5_maps
-    if name in {"estimate_hpc_center", "infer_fov_from_execute"}:
-        from .model import estimate_hpc_center, infer_fov_from_execute
+        return {"save_h5_maps": save_h5_maps, "save_h5_euv_maps": save_h5_euv_maps}[name]
+    if name in {
+        "estimate_hpc_center",
+        "infer_center_from_execute",
+        "infer_fov_from_execute",
+        "load_model_hdf",
+        "load_model_sav",
+        "load_model_dict",
+    }:
+        from .model import (
+            estimate_hpc_center,
+            infer_center_from_execute,
+            infer_fov_from_execute,
+            load_model_hdf,
+            load_model_sav,
+            load_model_dict,
+        )
 
-        return {"estimate_hpc_center": estimate_hpc_center, "infer_fov_from_execute": infer_fov_from_execute}[name]
+        return {
+            "estimate_hpc_center": estimate_hpc_center,
+            "infer_center_from_execute": infer_center_from_execute,
+            "infer_fov_from_execute": infer_fov_from_execute,
+            "load_model_hdf": load_model_hdf,
+            "load_model_sav": load_model_sav,
+            "load_model_dict": load_model_dict,
+        }[name]
     if name == "build_h5_from_sav":
         from .sav_to_h5 import build_h5_from_sav as _build_h5_from_sav
 

@@ -1,0 +1,20 @@
+; IDL batch script: compile local gximagecomputing routines with local precedence.
+; Run from IDL command line with:
+;   @/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/examples/idl/compile_local_idl
+
+.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/idlcode/ConvertToGX.pro'
+.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/idlcode/LoadGXmodel.pro'
+.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/idlcode/LoadEBTEL.pro'
+.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/idlcode/LoadEUVresponse.pro'
+.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/idlcode/MakeSimulationBox.pro'
+.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/idlcode/MakeSimulationBoxEUV.pro'
+.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/idlcode/DefineCoronaParams.pro'
+.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/idlcode/ReserveOutputSpace.pro'
+.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/idlcode/ReserveOutputSpaceEUV.pro'
+.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/idlcode/ConvertToMaps.pro'
+.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/idlcode/ConvertToMapsEUV.pro'
+.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/examples/idl/RenderExampleMW.pro'
+.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/examples/idl/RenderExampleEUV.pro'
+.compile, '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/tests/renderexampleeuv_test.pro'
+.compile, '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/tests/renderexamplemw_test.pro'
+print, 'Compiled local gximagecomputing IDL routines (MW + EUV).'

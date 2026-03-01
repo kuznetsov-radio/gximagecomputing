@@ -82,6 +82,7 @@ LDFLAGS = "-L$(brew --prefix libomp)/lib"
 [project.scripts]
 gxrender-map-view = "gximagecomputing.viz.render_map_view:main"
 gxrender-mw = "gximagecomputing.workflows.render_mw:main"
+gxrender-euv = "gximagecomputing.workflows.render_euv:main"
 gx-sav2h5 = "gximagecomputing.io.sav_to_h5:main"
 [tool.setuptools]
 package-dir = {"" = "src"}

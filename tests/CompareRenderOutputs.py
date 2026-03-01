@@ -21,7 +21,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-RENDER_SCRIPT = REPO_ROOT / "examples" / "RenderExampleMW.py"
+RENDER_SCRIPT = REPO_ROOT / "examples" / "python" / "cli" / "RenderExampleMW.py"
 DEFAULT_TMP_DIR = Path(tempfile.gettempdir())
 
 
