@@ -54,12 +54,12 @@ manylinux-i686-image = "manylinux2014"
 [[tool.cibuildwheel.overrides]]
 select = "*macosx_x86_64"
 inherit.environment = "append"
-environment.MACOSX_DEPLOYMENT_TARGET = "13.6"
+environment.MACOSX_DEPLOYMENT_TARGET = "15.0"
 
 [[tool.cibuildwheel.overrides]]
 select = "*macosx_arm64"
 inherit.environment = "append"
-environment.MACOSX_DEPLOYMENT_TARGET = "14.0"
+environment.MACOSX_DEPLOYMENT_TARGET = "15.0"
 
 #[[tool.cibuildwheel.overrides]]
 #select = "cp312*"
