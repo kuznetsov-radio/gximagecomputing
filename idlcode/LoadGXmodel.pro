@@ -1,5 +1,19 @@
-function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime
- forward_function LoadGXmodel__load_box
+function LoadGXmodel__load_box, infile
+ inlower=strlowcase(string(infile))
+ ext=strsplit(inlower, '.', /extract)
+ ext=ext[-1]
+ if (ext eq 'sav') or (ext eq 'xdr') then begin
+  restore, infile
+  return, box
+ endif
+ if (ext eq 'h5') or (ext eq 'hdf5') then begin
+  resolve_routine, 'ConvertToGX', /either
+  return, ConvertToGX(infile)
+ endif
+ message, 'Unsupported model format: '+infile
+end
+
+function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime, DSUN=dsun_kw, LONC=lonc_kw, B0SUN=b0sun_kw
  box=LoadGXmodel__load_box(infile)
 
  obstime=0d
@@ -43,6 +57,9 @@ function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime
  ; pyAMPP HDF5 index stores DSUN_OBS in meters; RenderGRFF expects centimeters.
  ; Keep backward compatibility with legacy SAV values already in centimeters.
  if DSun lt 1d12 then DSun=DSun*100d
+ if n_elements(dsun_kw) gt 0 then DSun=double(dsun_kw)
+ if n_elements(lonc_kw) gt 0 then lonC=double(lonc_kw)
+ if n_elements(b0sun_kw) gt 0 then b0Sun=double(b0sun_kw)
 
  dx=box.dr[0]*RSun
  dy=box.dr[1]*RSun
