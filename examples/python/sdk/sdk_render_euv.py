@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from gximagecomputing import (
+from pyGXrender import (
     EUVRenderOptions,
     MapGeometry,
     ObserverOverrides,

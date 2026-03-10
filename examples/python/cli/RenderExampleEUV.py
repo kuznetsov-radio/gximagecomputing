@@ -4,10 +4,10 @@
 
 This script remains in examples/ for user familiarity, but the implementation
 now lives in the installable package module:
-    gximagecomputing.workflows.render_euv
+    pyGXrender.workflows.render_euv
 """
 
-from gximagecomputing.workflows.render_euv import main
+from pyGXrender.workflows.render_euv import main
 
 
 if __name__ == "__main__":

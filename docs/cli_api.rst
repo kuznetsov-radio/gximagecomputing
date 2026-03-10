@@ -8,13 +8,13 @@ control.
 MW workflow
 -----------
 
-.. automodule:: gximagecomputing.workflows.render_mw
+.. automodule:: pyGXrender.workflows.render_mw
    :members:
    :undoc-members:
 
 EUV workflow
 ------------
 
-.. automodule:: gximagecomputing.workflows.render_euv
+.. automodule:: pyGXrender.workflows.render_euv
    :members:
    :undoc-members:

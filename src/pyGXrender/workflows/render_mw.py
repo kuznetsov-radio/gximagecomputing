@@ -3,15 +3,20 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-import gximagecomputing
+import pyGXrender
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import sunpy.map
 from astropy.io import fits
 
-from gximagecomputing.io.maps_h5 import save_h5_maps
-from gximagecomputing.workflows._render_common import DEFAULT_OUTDIR, model_obstime_iso, plasma_defaults, prepare_common_inputs
+from pyGXrender.io.maps_h5 import save_h5_maps
+from pyGXrender.workflows._render_common import (
+    DEFAULT_OUTDIR,
+    model_obstime_iso,
+    plasma_defaults,
+    prepare_common_inputs,
+)
 
 
 def _build_2d_wcs_meta(index_header: str, nx: int, ny: int, date_obs: str) -> dict:
@@ -38,7 +43,19 @@ def _build_2d_wcs_meta(index_header: str, nx: int, ny: int, date_obs: str) -> di
         hdr = fits.Header.fromstring(index_header, sep="\n")
     except Exception:
         return meta
-    for k in ("CTYPE1", "CTYPE2", "CUNIT1", "CUNIT2", "CDELT1", "CDELT2", "CRPIX1", "CRPIX2", "CRVAL1", "CRVAL2", "BUNIT"):
+    for k in (
+        "CTYPE1",
+        "CTYPE2",
+        "CUNIT1",
+        "CUNIT2",
+        "CDELT1",
+        "CDELT2",
+        "CRPIX1",
+        "CRPIX2",
+        "CRVAL1",
+        "CRVAL2",
+        "BUNIT",
+    ):
         if k in hdr:
             meta[k.lower()] = hdr[k]
     if "DATE-OBS" in hdr and not meta["date-obs"]:
@@ -54,10 +71,18 @@ def save_preview(h5_path: Path, out_png: Path, title: str) -> None:
         date_obs = ""
         if "metadata" in f and "index_header" in f["metadata"]:
             raw = f["metadata"]["index_header"][()]
-            index_header = raw.decode("utf-8", errors="replace") if isinstance(raw, (bytes, np.bytes_)) else str(raw)
+            index_header = (
+                raw.decode("utf-8", errors="replace")
+                if isinstance(raw, (bytes, np.bytes_))
+                else str(raw)
+            )
         if "metadata" in f and "date_obs" in f["metadata"]:
             raw_date = f["metadata"]["date_obs"][()]
-            date_obs = raw_date.decode("utf-8", errors="replace") if isinstance(raw_date, (bytes, np.bytes_)) else str(raw_date)
+            date_obs = (
+                raw_date.decode("utf-8", errors="replace")
+                if isinstance(raw_date, (bytes, np.bytes_))
+                else str(raw_date)
+            )
 
     if cube.ndim != 4 or cube.shape[-1] != 2:
         raise ValueError(f"Unexpected rendered-map cube shape: {cube.shape}")
@@ -66,7 +91,9 @@ def save_preview(h5_path: Path, out_png: Path, title: str) -> None:
     ti = cube[:, :, 0, 0].T
     tv = cube[:, :, 0, 1].T
     ny, nx = ti.shape
-    meta_base = _build_2d_wcs_meta(index_header=index_header, nx=nx, ny=ny, date_obs=date_obs)
+    meta_base = _build_2d_wcs_meta(
+        index_header=index_header, nx=nx, ny=ny, date_obs=date_obs
+    )
     freq0 = float(freqs[0]) if len(freqs) else float("nan")
 
     ti_meta = dict(meta_base)
@@ -90,8 +117,12 @@ def save_preview(h5_path: Path, out_png: Path, title: str) -> None:
     ax_ti.set_ylabel("Solar Y [arcsec]")
     ax_tv.set_xlabel("Solar X [arcsec]")
     ax_tv.set_ylabel("Solar Y [arcsec]")
-    cbar0 = fig.colorbar(im_ti, ax=ax_ti, orientation="vertical", fraction=0.046, pad=0.04)
-    cbar1 = fig.colorbar(im_tv, ax=ax_tv, orientation="vertical", fraction=0.046, pad=0.04)
+    cbar0 = fig.colorbar(
+        im_ti, ax=ax_ti, orientation="vertical", fraction=0.046, pad=0.04
+    )
+    cbar1 = fig.colorbar(
+        im_tv, ax=ax_tv, orientation="vertical", fraction=0.046, pad=0.04
+    )
     cbar0.set_label("Brightness Temperature [K]")
     cbar1.set_label("Brightness Temperature [K]")
     fig.tight_layout()
@@ -150,8 +181,15 @@ def save_sunpy_maps(
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Render MW maps from a single H5/SAV CHR model.")
-    p.add_argument("--model-path", type=Path, required=True, help="Path to input CHR model (.h5 or .sav).")
+    p = argparse.ArgumentParser(
+        description="Render MW maps from a single H5/SAV CHR model."
+    )
+    p.add_argument(
+        "--model-path",
+        type=Path,
+        required=True,
+        help="Path to input CHR model (.h5 or .sav).",
+    )
     p.add_argument("--model-format", choices=["h5", "sav", "auto"], default="auto")
     p.add_argument(
         "--ebtel-path",
@@ -175,21 +213,54 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--omp-threads", type=int, default=8)
     p.add_argument("--xc", type=float, default=None)
     p.add_argument("--yc", type=float, default=None)
-    p.add_argument("--dsun-cm", type=float, default=None, help="Override model.DSun before rendering (cm).")
-    p.add_argument("--lonc-deg", type=float, default=None, help="Override model.lonC before rendering (deg).")
-    p.add_argument("--b0sun-deg", type=float, default=None, help="Override model.b0Sun before rendering (deg).")
-    p.add_argument("--dx", type=float, default=None, help="Pixel scale along X (arcsec/pixel). Default: 2.0")
-    p.add_argument("--dy", type=float, default=None, help="Pixel scale along Y (arcsec/pixel). Default: 2.0")
+    p.add_argument(
+        "--dsun-cm",
+        type=float,
+        default=None,
+        help="Override model.DSun before rendering (cm).",
+    )
+    p.add_argument(
+        "--lonc-deg",
+        type=float,
+        default=None,
+        help="Override model.lonC before rendering (deg).",
+    )
+    p.add_argument(
+        "--b0sun-deg",
+        type=float,
+        default=None,
+        help="Override model.b0Sun before rendering (deg).",
+    )
+    p.add_argument(
+        "--dx",
+        type=float,
+        default=None,
+        help="Pixel scale along X (arcsec/pixel). Default: 2.0",
+    )
+    p.add_argument(
+        "--dy",
+        type=float,
+        default=None,
+        help="Pixel scale along Y (arcsec/pixel). Default: 2.0",
+    )
     p.add_argument(
         "--pixel-scale-arcsec",
         type=float,
         default=None,
         help="Legacy shorthand: sets both --dx and --dy when they are omitted.",
     )
-    p.add_argument("--nx", type=int, default=None, help="Optional fixed output width in pixels.")
-    p.add_argument("--ny", type=int, default=None, help="Optional fixed output height in pixels.")
-    p.add_argument("--xrange", type=float, nargs=2, default=None, metavar=("XMIN", "XMAX"))
-    p.add_argument("--yrange", type=float, nargs=2, default=None, metavar=("YMIN", "YMAX"))
+    p.add_argument(
+        "--nx", type=int, default=None, help="Optional fixed output width in pixels."
+    )
+    p.add_argument(
+        "--ny", type=int, default=None, help="Optional fixed output height in pixels."
+    )
+    p.add_argument(
+        "--xrange", type=float, nargs=2, default=None, metavar=("XMIN", "XMAX")
+    )
+    p.add_argument(
+        "--yrange", type=float, nargs=2, default=None, metavar=("YMIN", "YMAX")
+    )
     return p.parse_args()
 
 
@@ -208,7 +279,7 @@ def run(args: argparse.Namespace, *, verbose: bool = True) -> dict:
     model_path = common.model_path
     loader = common.loader
 
-    gxi = gximagecomputing.GXRadioImageComputing()
+    gxi = pyGXrender.GXRadioImageComputing()
     model = common.model
     model_dt = common.model_dt
     ebtel_path = common.ebtel_path
@@ -311,13 +382,22 @@ def run(args: argparse.Namespace, *, verbose: bool = True) -> dict:
         if ebtel_path:
             print(f"Using EBTEL: {ebtel_path}")
         else:
-            print("Using EBTEL: none (DEM/heating tables disabled; isothermal/hydrostatic fallback)")
+            print(
+                "Using EBTEL: none (DEM/heating tables disabled; isothermal/hydrostatic fallback)"
+            )
         print(f"Model: {model_path} ({loader})")
         if common.observer_overrides_applied:
-            print("Observer overrides: " + ", ".join(f"{k}={v}" for k, v in common.observer_overrides_applied.items()))
+            print(
+                "Observer overrides: "
+                + ", ".join(
+                    f"{k}={v}" for k, v in common.observer_overrides_applied.items()
+                )
+            )
         print(f"Center source: {center_source}")
         print(f"Center used: xc={xc:.3f}, yc={yc:.3f} arcsec")
-        print(f"FOV={fov_x:.2f}x{fov_y:.2f} arcsec; N={nx}x{ny}; dx={dx:.2f}, dy={dy:.2f} arcsec")
+        print(
+            f"FOV={fov_x:.2f}x{fov_y:.2f} arcsec; N={nx}x{ny}; dx={dx:.2f}, dy={dy:.2f} arcsec"
+        )
         if save_outputs:
             print("Outputs:")
             if args.output_format in {"h5", "both"} and h5_path is not None:

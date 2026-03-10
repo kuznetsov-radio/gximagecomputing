@@ -4,7 +4,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from gximagecomputing import MapGeometry, MWRenderOptions, ObserverOverrides, render_mw_maps
+from pyGXrender import MapGeometry, MWRenderOptions, ObserverOverrides, render_mw_maps
 
 
 def parse_args() -> argparse.Namespace:

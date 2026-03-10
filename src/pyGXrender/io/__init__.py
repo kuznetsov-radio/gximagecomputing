@@ -1,4 +1,4 @@
-"""I/O helpers for gximagecomputing models, EBTEL tables, and rendered map products."""
+"""I/O helpers for pyGXrender models, EBTEL tables, and rendered map products."""
 
 __all__ = [
     "resolve_ebtel_path",
@@ -30,7 +30,9 @@ def __getattr__(name):
     if name in {"save_h5_maps", "save_h5_euv_maps"}:
         from .maps_h5 import save_h5_maps, save_h5_euv_maps
 
-        return {"save_h5_maps": save_h5_maps, "save_h5_euv_maps": save_h5_euv_maps}[name]
+        return {"save_h5_maps": save_h5_maps, "save_h5_euv_maps": save_h5_euv_maps}[
+            name
+        ]
     if name in {
         "estimate_hpc_center",
         "infer_center_from_execute",
@@ -64,4 +66,4 @@ def __getattr__(name):
         from .voxel_id import gx_box2id, gx_voxelid
 
         return {"gx_box2id": gx_box2id, "gx_voxelid": gx_voxelid}[name]
-    raise AttributeError(f"module 'gximagecomputing.io' has no attribute {name!r}")
+    raise AttributeError(f"module 'pyGXrender.io' has no attribute {name!r}")

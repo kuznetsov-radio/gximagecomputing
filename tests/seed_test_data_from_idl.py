@@ -26,7 +26,7 @@ def _import_builder(repo_root: Path):
     src_dir = repo_root / "src"
     if str(src_dir) not in sys.path:
         sys.path.insert(0, str(src_dir))
-    from gximagecomputing.io.sav_to_h5 import build_h5_from_sav
+    from pyGXrender.io.sav_to_h5 import build_h5_from_sav
 
     return build_h5_from_sav
 
@@ -34,7 +34,7 @@ def _import_builder(repo_root: Path):
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=(
-            "Seed gximagecomputing/test_data from an IDL CHR SAV file by copying to "
+            "Seed pyGXrender/test_data from an IDL CHR SAV file by copying to "
             "test.chr.sav and converting to test.chr.h5."
         )
     )

@@ -3,11 +3,13 @@ dist/
 *.egg-info/
 __pycache__/
 *.py[cod]
+.ipynb_checkpoints
+*.ipynb
 
 # Local compiled extension artifacts from editable/dev builds
-src/gximagecomputing/RenderGRFF*.so
-src/gximagecomputing/RenderGRFF*.dylib
-src/gximagecomputing/RenderGRFF*.dll
+src/pyGXrender/RenderGRFF*.so
+src/pyGXrender/RenderGRFF*.dylib
+src/pyGXrender/RenderGRFF*.dll
 
 # Local validation data (large; keep outside git history)
 test_data/

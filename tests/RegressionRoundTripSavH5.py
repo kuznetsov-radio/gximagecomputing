@@ -23,17 +23,19 @@ import numpy as np
 # Avoid SunPy config write failures in restricted environments.
 os.environ.setdefault(
     "SUNPY_CONFIGDIR",
-    str(Path(tempfile.gettempdir()) / "gximagecomputing_sunpy_config"),
+    str(Path(tempfile.gettempdir()) / "pyGXrender_sunpy_config"),
 )
 
-from gximagecomputing.io.sav_to_h5 import build_h5_from_sav
-from gximagecomputing.radio import GXRadioImageComputing
+from pyGXrender.io.sav_to_h5 import build_h5_from_sav
+from pyGXrender.radio import GXRadioImageComputing
 
 
 def _parse_args() -> argparse.Namespace:
     root = Path(__file__).resolve().parents[1]
     test_data = root / "test_data"
-    p = argparse.ArgumentParser(description="Strict regression check for SAV/H5 parity.")
+    p = argparse.ArgumentParser(
+        description="Strict regression check for SAV/H5 parity."
+    )
     p.add_argument(
         "--sav-path",
         type=Path,
@@ -66,7 +68,9 @@ def _parse_args() -> argparse.Namespace:
     return p.parse_args()
 
 
-def _compare_models(model_h5: np.ndarray, model_sav: np.ndarray, atol: float, rtol: float) -> Dict[str, str]:
+def _compare_models(
+    model_h5: np.ndarray, model_sav: np.ndarray, atol: float, rtol: float
+) -> Dict[str, str]:
     failures: Dict[str, str] = {}
 
     names_h5 = set(model_h5.dtype.names or [])
@@ -87,10 +91,16 @@ def _compare_models(model_h5: np.ndarray, model_sav: np.ndarray, atol: float, rt
             continue
 
         if np.issubdtype(h.dtype, np.number) and np.issubdtype(s.dtype, np.number):
-            if np.issubdtype(h.dtype, np.floating) or np.issubdtype(s.dtype, np.floating):
+            if np.issubdtype(h.dtype, np.floating) or np.issubdtype(
+                s.dtype, np.floating
+            ):
                 if not np.allclose(h, s, atol=atol, rtol=rtol, equal_nan=True):
-                    max_abs = float(np.max(np.abs(h.astype(np.float64) - s.astype(np.float64))))
-                    failures[name] = f"float mismatch: max_abs={max_abs:.6g}, atol={atol}, rtol={rtol}"
+                    max_abs = float(
+                        np.max(np.abs(h.astype(np.float64) - s.astype(np.float64)))
+                    )
+                    failures[name] = (
+                        f"float mismatch: max_abs={max_abs:.6g}, atol={atol}, rtol={rtol}"
+                    )
             else:
                 if not np.array_equal(h, s):
                     failures[name] = "integer mismatch"
@@ -121,6 +131,7 @@ def main() -> int:
 
     # CHR-only regression: reject non-CHR outputs even though converter is stage-agnostic.
     import h5py
+
     with h5py.File(h5_path, "r") as f:
         if "chromo" not in f:
             print(

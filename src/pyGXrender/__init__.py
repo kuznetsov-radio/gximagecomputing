@@ -62,4 +62,4 @@ def __getattr__(name):
 
         return getattr(_sdk, name)
 
-    raise AttributeError(f"module 'gximagecomputing' has no attribute {name!r}")
+    raise AttributeError(f"module 'pyGXrender' has no attribute {name!r}")

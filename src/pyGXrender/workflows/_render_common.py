@@ -8,8 +8,8 @@ from typing import Any
 import numpy as np
 from astropy.time import Time
 
-from gximagecomputing.io.ebtel import load_ebtel, load_ebtel_none, resolve_ebtel_path
-from gximagecomputing.io.model import (
+from pyGXrender.io.ebtel import load_ebtel, load_ebtel_none, resolve_ebtel_path
+from pyGXrender.io.model import (
     estimate_hpc_center,
     infer_center_from_execute,
     infer_fov_from_execute,
@@ -18,9 +18,9 @@ from gximagecomputing.io.model import (
 )
 
 DEFAULT_OUTDIR = (
-    Path("C:/Temp/gximagecomputing_validation_groundtruth")
+    Path("C:/Temp/pyGXrender_validation_groundtruth")
     if os.name == "nt"
-    else Path("/tmp/gximagecomputing_validation_groundtruth")
+    else Path("/tmp/pyGXrender_validation_groundtruth")
 )
 
 
@@ -101,7 +101,11 @@ def load_model_and_fov(
             b0sun_deg=observer_overrides.get("b0sun_deg"),
         )
 
-    center_exec = infer_center_from_execute(loader_name=loader, model_path=model_path) if prefer_execute_center else None
+    center_exec = (
+        infer_center_from_execute(loader_name=loader, model_path=model_path)
+        if prefer_execute_center
+        else None
+    )
     if center_exec is not None:
         xc_auto, yc_auto = float(center_exec[0]), float(center_exec[1])
         center_source = "execute"
@@ -117,7 +121,16 @@ def load_model_and_fov(
         fallback_ny=int(model["Ny"][0]),
         fallback_dx_cm=float(model["dx"][0]),
     )
-    return model, model_dt, center_source, xc_auto, yc_auto, float(model_w_arcsec), float(model_h_arcsec), applied_overrides
+    return (
+        model,
+        model_dt,
+        center_source,
+        xc_auto,
+        yc_auto,
+        float(model_w_arcsec),
+        float(model_h_arcsec),
+        applied_overrides,
+    )
 
 
 def resolve_box_from_args(
@@ -147,24 +160,36 @@ def resolve_box_from_args(
         if xmax <= xmin:
             raise ValueError("--xrange requires XMAX > XMIN.")
         if getattr(args, "nx", None) is not None:
-            print("Note: --xrange provided, so --nx is ignored and recomputed from --dx.")
+            print(
+                "Note: --xrange provided, so --nx is ignored and recomputed from --dx."
+            )
         xc = 0.5 * (xmin + xmax)
         nx = max(16, int(np.ceil((xmax - xmin) / dx)))
     else:
         xc = float(args.xc) if args.xc is not None else float(xc_auto)
-        nx = max(16, int(args.nx)) if args.nx is not None else max(16, int(np.ceil(model_w_arcsec / dx)))
+        nx = (
+            max(16, int(args.nx))
+            if args.nx is not None
+            else max(16, int(np.ceil(model_w_arcsec / dx)))
+        )
 
     if args.yrange is not None:
         ymin, ymax = float(args.yrange[0]), float(args.yrange[1])
         if ymax <= ymin:
             raise ValueError("--yrange requires YMAX > YMIN.")
         if getattr(args, "ny", None) is not None:
-            print("Note: --yrange provided, so --ny is ignored and recomputed from --dy.")
+            print(
+                "Note: --yrange provided, so --ny is ignored and recomputed from --dy."
+            )
         yc = 0.5 * (ymin + ymax)
         ny = max(16, int(np.ceil((ymax - ymin) / dy)))
     else:
         yc = float(args.yc) if args.yc is not None else float(yc_auto)
-        ny = max(16, int(args.ny)) if args.ny is not None else max(16, int(np.ceil(model_h_arcsec / dy)))
+        ny = (
+            max(16, int(args.ny))
+            if args.ny is not None
+            else max(16, int(np.ceil(model_h_arcsec / dy)))
+        )
 
     fov_x = float(nx) * float(dx)
     fov_y = float(ny) * float(dy)
@@ -221,7 +246,16 @@ def prepare_common_inputs(
     model_path = Path(args.model_path)
     loader = resolve_model_loader(model_path, args.model_format)
     ebtel_path, ebtel_c, ebtel_dt = load_ebtel_from_arg(args.ebtel_path)
-    model, model_dt, center_source, xc_auto, yc_auto, model_w_arcsec, model_h_arcsec, applied_overrides = load_model_and_fov(
+    (
+        model,
+        model_dt,
+        center_source,
+        xc_auto,
+        yc_auto,
+        model_w_arcsec,
+        model_h_arcsec,
+        applied_overrides,
+    ) = load_model_and_fov(
         model_path,
         loader,
         prefer_execute_center=prefer_execute_center,

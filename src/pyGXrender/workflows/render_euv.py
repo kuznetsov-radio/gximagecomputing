@@ -8,9 +8,18 @@ import matplotlib.pyplot as plt
 import numpy as np
 import sunpy.map
 
-from gximagecomputing.euv import GXEUVImageComputing, build_default_euv_response, load_euv_response_sav
-from gximagecomputing.io.maps_h5 import save_h5_euv_maps
-from gximagecomputing.workflows._render_common import DEFAULT_OUTDIR, model_obstime_iso, plasma_defaults, prepare_common_inputs
+from pyGXrender.euv import (
+    GXEUVImageComputing,
+    build_default_euv_response,
+    load_euv_response_sav,
+)
+from pyGXrender.io.maps_h5 import save_h5_euv_maps
+from pyGXrender.workflows._render_common import (
+    DEFAULT_OUTDIR,
+    model_obstime_iso,
+    plasma_defaults,
+    prepare_common_inputs,
+)
 
 
 def _resolve_default_response_sav(instrument: str) -> Path | None:
@@ -41,7 +50,18 @@ def _resolve_default_response_sav(instrument: str) -> Path | None:
     return None
 
 
-def _preview_euv(flux_cor: np.ndarray, flux_tr: np.ndarray, channel: str, out_png: Path, title: str, obs_time_iso: str, xc: float, yc: float, dx: float, dy: float):
+def _preview_euv(
+    flux_cor: np.ndarray,
+    flux_tr: np.ndarray,
+    channel: str,
+    out_png: Path,
+    title: str,
+    obs_time_iso: str,
+    xc: float,
+    yc: float,
+    dx: float,
+    dy: float,
+):
     ny, nx = flux_cor.shape[0], flux_cor.shape[1]
     meta = {
         "naxis": 2,
@@ -60,9 +80,13 @@ def _preview_euv(flux_cor: np.ndarray, flux_tr: np.ndarray, channel: str, out_pn
         "date-obs": obs_time_iso,
         "bunit": "DN s^-1 pix^-1",
     }
-    m_cor = sunpy.map.Map(flux_cor, dict(meta, content="EUV_CORONA", channel=str(channel)))
+    m_cor = sunpy.map.Map(
+        flux_cor, dict(meta, content="EUV_CORONA", channel=str(channel))
+    )
     m_tr = sunpy.map.Map(flux_tr, dict(meta, content="EUV_TR", channel=str(channel)))
-    m_sum = sunpy.map.Map((flux_cor + flux_tr), dict(meta, content="EUV_SUM", channel=str(channel)))
+    m_sum = sunpy.map.Map(
+        (flux_cor + flux_tr), dict(meta, content="EUV_SUM", channel=str(channel))
+    )
 
     fig = plt.figure(figsize=(12, 3.8))
     ax1 = fig.add_subplot(1, 3, 1, projection=m_cor)
@@ -86,8 +110,15 @@ def _preview_euv(flux_cor: np.ndarray, flux_tr: np.ndarray, channel: str, out_pn
 
 
 def parse_args() -> argparse.Namespace:
-    p = argparse.ArgumentParser(description="Render EUV maps from a single H5/SAV CHR model.")
-    p.add_argument("--model-path", type=Path, required=True, help="Path to input CHR model (.h5 or .sav).")
+    p = argparse.ArgumentParser(
+        description="Render EUV maps from a single H5/SAV CHR model."
+    )
+    p.add_argument(
+        "--model-path",
+        type=Path,
+        required=True,
+        help="Path to input CHR model (.h5 or .sav).",
+    )
     p.add_argument("--model-format", choices=["h5", "sav", "auto"], default="auto")
     p.add_argument(
         "--ebtel-path",
@@ -96,23 +127,56 @@ def parse_args() -> argparse.Namespace:
         help='Optional EBTEL table (.sav). Use "" to explicitly disable and force isothermal mode.',
     )
     p.add_argument("--output-dir", type=Path, default=DEFAULT_OUTDIR)
-    p.add_argument("--output-name", type=str, default=None, help="Default: <model-basename>_py_euv_maps.h5")
-    p.add_argument("--channels", nargs="*", default=["94", "131", "171", "193", "211", "304", "335"])
+    p.add_argument(
+        "--output-name",
+        type=str,
+        default=None,
+        help="Default: <model-basename>_py_euv_maps.h5",
+    )
+    p.add_argument(
+        "--channels",
+        nargs="*",
+        default=["94", "131", "171", "193", "211", "304", "335"],
+    )
     p.add_argument("--instrument", type=str, default="AIA")
-    p.add_argument("--response-sav", type=Path, default=None, help="Path to IDL gxresponse SAV (e.g., aia_response.sav)")
+    p.add_argument(
+        "--response-sav",
+        type=Path,
+        default=None,
+        help="Path to IDL gxresponse SAV (e.g., aia_response.sav)",
+    )
     p.add_argument("--omp-threads", type=int, default=8)
     p.add_argument("--xc", type=float, default=None)
     p.add_argument("--yc", type=float, default=None)
-    p.add_argument("--dsun-cm", type=float, default=None, help="Override model.DSun before rendering (cm).")
-    p.add_argument("--lonc-deg", type=float, default=None, help="Override model.lonC before rendering (deg).")
-    p.add_argument("--b0sun-deg", type=float, default=None, help="Override model.b0Sun before rendering (deg).")
+    p.add_argument(
+        "--dsun-cm",
+        type=float,
+        default=None,
+        help="Override model.DSun before rendering (cm).",
+    )
+    p.add_argument(
+        "--lonc-deg",
+        type=float,
+        default=None,
+        help="Override model.lonC before rendering (deg).",
+    )
+    p.add_argument(
+        "--b0sun-deg",
+        type=float,
+        default=None,
+        help="Override model.b0Sun before rendering (deg).",
+    )
     p.add_argument("--dx", type=float, default=None)
     p.add_argument("--dy", type=float, default=None)
     p.add_argument("--pixel-scale-arcsec", type=float, default=None)
     p.add_argument("--nx", type=int, default=None)
     p.add_argument("--ny", type=int, default=None)
-    p.add_argument("--xrange", type=float, nargs=2, default=None, metavar=("XMIN", "XMAX"))
-    p.add_argument("--yrange", type=float, nargs=2, default=None, metavar=("YMIN", "YMAX"))
+    p.add_argument(
+        "--xrange", type=float, nargs=2, default=None, metavar=("XMIN", "XMAX")
+    )
+    p.add_argument(
+        "--yrange", type=float, nargs=2, default=None, metavar=("YMIN", "YMAX")
+    )
     return p.parse_args()
 
 
@@ -149,11 +213,15 @@ def run(args: argparse.Namespace, *, verbose: bool = True) -> dict:
     fov_y = common.fov_y
 
     if args.response_sav is not None:
-        response, response_dt, response_meta = load_euv_response_sav(str(args.response_sav))
+        response, response_dt, response_meta = load_euv_response_sav(
+            str(args.response_sav)
+        )
     else:
         auto_response_sav = _resolve_default_response_sav(args.instrument)
         if auto_response_sav is not None:
-            response, response_dt, response_meta = load_euv_response_sav(str(auto_response_sav))
+            response, response_dt, response_meta = load_euv_response_sav(
+                str(auto_response_sav)
+            )
         else:
             response, response_dt, response_meta = build_default_euv_response(
                 instrument=args.instrument, channels=[str(c) for c in args.channels]
@@ -185,7 +253,11 @@ def run(args: argparse.Namespace, *, verbose: bool = True) -> dict:
     )
 
     out_dir = args.output_dir
-    out_name = args.output_name if args.output_name is not None else f"{model_path.name}_py_euv_maps.h5"
+    out_name = (
+        args.output_name
+        if args.output_name is not None
+        else f"{model_path.name}_py_euv_maps.h5"
+    )
     out_h5 = out_dir / out_name
     obs_time_iso = model_obstime_iso(model)
     preview_path = out_dir / f"{model_path.name}_py_euv_maps_preview.png"
@@ -225,18 +297,31 @@ def run(args: argparse.Namespace, *, verbose: bool = True) -> dict:
         if ebtel_path:
             print(f"Using EBTEL: {ebtel_path}")
         else:
-            print("Using EBTEL: none (DEM/heating tables disabled; isothermal/hydrostatic fallback)")
+            print(
+                "Using EBTEL: none (DEM/heating tables disabled; isothermal/hydrostatic fallback)"
+            )
         print(f"Model: {model_path} ({loader})")
         if common.observer_overrides_applied:
-            print("Observer overrides: " + ", ".join(f"{k}={v}" for k, v in common.observer_overrides_applied.items()))
+            print(
+                "Observer overrides: "
+                + ", ".join(
+                    f"{k}={v}" for k, v in common.observer_overrides_applied.items()
+                )
+            )
         print(f"Center source: {center_source}")
         print(f"Center used: xc={xc:.3f}, yc={yc:.3f} arcsec")
-        print(f"FOV={fov_x:.2f}x{fov_y:.2f} arcsec; N={nx}x{ny}; dx={dx:.2f}, dy={dy:.2f} arcsec")
-        print(f"Response: {response_meta.instrument} channels={','.join(response_meta.channels)}")
+        print(
+            f"FOV={fov_x:.2f}x{fov_y:.2f} arcsec; N={nx}x{ny}; dx={dx:.2f}, dy={dy:.2f} arcsec"
+        )
+        print(
+            f"Response: {response_meta.instrument} channels={','.join(response_meta.channels)}"
+        )
         if response_meta.source:
             print(f"Response source: {response_meta.source} ({response_meta.mode})")
         else:
-            print("Response source: synthetic fallback (not IDL-equivalent); pass --response-sav or set GXIMAGECOMPUTING_EUV_RESPONSE_SAV")
+            print(
+                "Response source: synthetic fallback (not IDL-equivalent); pass --response-sav or set GXIMAGECOMPUTING_EUV_RESPONSE_SAV"
+            )
         if save_outputs:
             print("Outputs:")
             print(f"- h5: {h5_path}")

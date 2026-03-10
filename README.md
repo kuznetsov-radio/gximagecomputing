@@ -1,4 +1,4 @@
-# gximagecomputing
+# gximagecomputing / pyGXrender
 
 This code computes 2D maps of the solar microwave (gyroresonance and free-free) and EUV (spectral lines) emission, using models of active regions created by the [**GX Simulator**](https://github.com/Gelu-Nita/GX_SIMULATOR/) (requires SolarSoft GX_Simulator package).
 
@@ -10,10 +10,10 @@ This code computes 2D maps of the solar microwave (gyroresonance and free-free) 
 
 PyPI distribution name: `pyGXrender`
 
-Python import package remains:
+Python import package:
 
 ```python
-import gximagecomputing
+import pyGXrender
 ```
 
 Install from PyPI:
@@ -152,7 +152,7 @@ You can also call the same workflow from Python:
 
 ```python
 from argparse import Namespace
-from gximagecomputing.workflows.render_mw import run
+from pyGXrender.workflows.render_mw import run
 
 args = Namespace(
     model_path="/path/to/your.chr.h5",
@@ -177,22 +177,22 @@ run(args)
 
 ### Professional SDK Usage (Programmatic, No CLI/argparse Coupling)
 
-For application integration, prefer the SDK layer in `gximagecomputing.sdk` (also re-exported at package root).
+For application integration, prefer the SDK layer in `pyGXrender.sdk` (also re-exported at package root).
 This avoids `argparse.Namespace`-style calls and provides typed option objects for MW and EUV rendering.
 
 Available SDK entry points:
 
-- `gximagecomputing.render_mw_maps(...)`
-- `gximagecomputing.render_euv_maps(...)`
-- `gximagecomputing.MWRenderOptions`
-- `gximagecomputing.EUVRenderOptions`
-- `gximagecomputing.MapGeometry`
-- `gximagecomputing.ObserverOverrides`
+- `pyGXrender.render_mw_maps(...)`
+- `pyGXrender.render_euv_maps(...)`
+- `pyGXrender.MWRenderOptions`
+- `pyGXrender.EUVRenderOptions`
+- `pyGXrender.MapGeometry`
+- `pyGXrender.ObserverOverrides`
 
 MW SDK example:
 
 ```python
-from gximagecomputing import MapGeometry, MWRenderOptions, ObserverOverrides, render_mw_maps
+from pyGXrender import MapGeometry, MWRenderOptions, ObserverOverrides, render_mw_maps
 
 result = render_mw_maps(
     MWRenderOptions(
@@ -219,7 +219,7 @@ print(result.geometry.nx, result.geometry.ny)
 EUV SDK example:
 
 ```python
-from gximagecomputing import EUVRenderOptions, MapGeometry, ObserverOverrides, render_euv_maps
+from pyGXrender import EUVRenderOptions, MapGeometry, ObserverOverrides, render_euv_maps
 
 result = render_euv_maps(
     EUVRenderOptions(

@@ -6,12 +6,12 @@ import argparse
 import tempfile
 from pathlib import Path
 
-from gximagecomputing.io.sav_to_h5 import build_h5_from_sav
+from pyGXrender.io.sav_to_h5 import build_h5_from_sav
 
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
-        description="Legacy test wrapper around gximagecomputing.io.sav_to_h5.build_h5_from_sav."
+        description="Legacy test wrapper around pyGXrender.io.sav_to_h5.build_h5_from_sav."
     )
     p.add_argument(
         "--template-h5",
