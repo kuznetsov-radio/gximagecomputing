@@ -55,7 +55,9 @@ def _stats(h5: np.ndarray, sav: np.ndarray, eps: float = 1e-12) -> Dict[str, flo
 
 
 def parse_args():
-    p = argparse.ArgumentParser(description="Compare normalized render-input arrays (H5 vs SAV).")
+    p = argparse.ArgumentParser(
+        description="Compare normalized render-input arrays (H5 vs SAV)."
+    )
     p.add_argument(
         "--h5-path",
         type=Path,
@@ -82,7 +84,10 @@ def main():
     if args.sav_path is None:
         args.sav_path = find_model_file("test.chr.sav")
     if args.output_json is None:
-        args.output_json = Path(tempfile.gettempdir()) / f"gximage_render_inputs_compare_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        args.output_json = (
+            Path(tempfile.gettempdir())
+            / f"gximage_render_inputs_compare_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
 
     g = GXRadioImageComputing.__new__(GXRadioImageComputing)
     mh5, _ = g.load_model_hdf(str(args.h5_path))
@@ -108,7 +113,9 @@ def main():
         entry["shape_match"] = True
         if np.issubdtype(h.dtype, np.number) and np.issubdtype(s.dtype, np.number):
             entry.update(_stats(h.astype(np.float64), s.astype(np.float64)))
-            entry["allclose"] = bool(np.allclose(h, s, rtol=1e-5, atol=1e-6, equal_nan=True))
+            entry["allclose"] = bool(
+                np.allclose(h, s, rtol=1e-5, atol=1e-6, equal_nan=True)
+            )
         else:
             entry["allclose"] = bool(np.array_equal(h, s))
         if not entry["allclose"]:
@@ -116,18 +123,12 @@ def main():
         report["fields"][f] = entry
 
     ranked_abs = sorted(
-        (
-            (k, v.get("max_abs_diff", -1.0))
-            for k, v in report["fields"].items()
-        ),
+        ((k, v.get("max_abs_diff", -1.0)) for k, v in report["fields"].items()),
         key=lambda x: x[1],
         reverse=True,
     )
     ranked_rel = sorted(
-        (
-            (k, v.get("max_rel_diff", -1.0))
-            for k, v in report["fields"].items()
-        ),
+        ((k, v.get("max_rel_diff", -1.0)) for k, v in report["fields"].items()),
         key=lambda x: x[1],
         reverse=True,
     )

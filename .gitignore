@@ -3,6 +3,8 @@ dist/
 *.egg-info/
 __pycache__/
 *.py[cod]
+.ipynb_checkpoints
+*.ipynb
 
 # Local compiled extension artifacts from editable/dev builds
 src/gxrender/RenderGRFF*.so

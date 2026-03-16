@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 """
-Compare internal gximagecomputing model representations derived from:
+Compare internal pyGXrender model representations derived from:
 1) pyAMPP CHR HDF5
 2) GX Simulator IDL CHR SAV
 
@@ -27,7 +27,9 @@ def _is_numeric(arr: np.ndarray) -> bool:
     return np.issubdtype(arr.dtype, np.number)
 
 
-def _stats_numeric(h5_arr: np.ndarray, sav_arr: np.ndarray, rel_eps: float) -> Dict[str, Any]:
+def _stats_numeric(
+    h5_arr: np.ndarray, sav_arr: np.ndarray, rel_eps: float
+) -> Dict[str, Any]:
     out: Dict[str, Any] = {}
     if h5_arr.shape != sav_arr.shape:
         out["shape_match"] = False
@@ -73,7 +75,9 @@ def _stats_numeric(h5_arr: np.ndarray, sav_arr: np.ndarray, rel_eps: float) -> D
         out["max_rel_diff"] = None
         out["p95_rel_diff"] = None
 
-    out["allclose"] = bool(np.allclose(h5_arr, sav_arr, rtol=1e-5, atol=1e-6, equal_nan=True))
+    out["allclose"] = bool(
+        np.allclose(h5_arr, sav_arr, rtol=1e-5, atol=1e-6, equal_nan=True)
+    )
     return out
 
 
@@ -144,20 +148,30 @@ def compare_models(
         sortable.append(
             (
                 name,
-                info.get("max_abs_diff", -1.0) if info.get("max_abs_diff") is not None else -1.0,
-                info.get("max_rel_diff", -1.0) if info.get("max_rel_diff") is not None else -1.0,
+                info.get("max_abs_diff", -1.0)
+                if info.get("max_abs_diff") is not None
+                else -1.0,
+                info.get("max_rel_diff", -1.0)
+                if info.get("max_rel_diff") is not None
+                else -1.0,
             )
         )
     sortable_abs = sorted(sortable, key=lambda x: x[1], reverse=True)
     sortable_rel = sorted(sortable, key=lambda x: x[2], reverse=True)
-    report["top_max_abs_diff"] = [{"field": k, "max_abs_diff": v} for k, v, _ in sortable_abs[:10]]
-    report["top_max_rel_diff"] = [{"field": k, "max_rel_diff": v} for k, _, v in sortable_rel[:10]]
+    report["top_max_abs_diff"] = [
+        {"field": k, "max_abs_diff": v} for k, v, _ in sortable_abs[:10]
+    ]
+    report["top_max_rel_diff"] = [
+        {"field": k, "max_rel_diff": v} for k, _, v in sortable_rel[:10]
+    ]
 
     return report
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Compare gximagecomputing models loaded from HDF5 vs SAV.")
+    parser = argparse.ArgumentParser(
+        description="Compare gximagecomputing models loaded from HDF5 vs SAV."
+    )
     parser.add_argument(
         "--h5-path",
         type=Path,
@@ -192,7 +206,10 @@ def main() -> None:
     if args.sav_path is None:
         args.sav_path = find_model_file("test.chr.sav")
     if args.output_json is None:
-        args.output_json = Path(tempfile.gettempdir()) / f"gximage_model_compare_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        args.output_json = (
+            Path(tempfile.gettempdir())
+            / f"gximage_model_compare_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        )
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
 
     # Avoid constructor to compare models without requiring native library availability.

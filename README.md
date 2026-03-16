@@ -1,4 +1,4 @@
-# gximagecomputing
+# gximagecomputing / pyGXrender
 
 This code computes 2D maps of the solar microwave (gyroresonance and free-free) and EUV (spectral lines) emission, using models of active regions created by the [**GX Simulator**](https://github.com/Gelu-Nita/GX_SIMULATOR/) (requires SolarSoft GX_Simulator package).
 
@@ -10,7 +10,7 @@ This code computes 2D maps of the solar microwave (gyroresonance and free-free) 
 
 PyPI distribution name: `pyGXrender`
 
-Python import package remains:
+Python import package:
 
 ```python
 import gxrender

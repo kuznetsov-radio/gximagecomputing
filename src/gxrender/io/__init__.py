@@ -30,7 +30,9 @@ def __getattr__(name):
     if name in {"save_h5_maps", "save_h5_euv_maps"}:
         from .maps_h5 import save_h5_maps, save_h5_euv_maps
 
-        return {"save_h5_maps": save_h5_maps, "save_h5_euv_maps": save_h5_euv_maps}[name]
+        return {"save_h5_maps": save_h5_maps, "save_h5_euv_maps": save_h5_euv_maps}[
+            name
+        ]
     if name in {
         "estimate_hpc_center",
         "infer_center_from_execute",

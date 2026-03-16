@@ -89,30 +89,68 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Dump exact ComputeEUV inputs (Python side) before the DLL call.")
     p.add_argument("--model-path", type=Path, default=None)
     p.add_argument("--model-format", choices=["h5", "sav", "auto"], default="auto")
-    p.add_argument("--ebtel-path", type=str, default=None, help='Optional EBTEL table (.sav). Use "" to disable.')
-    p.add_argument("--response-sav", type=Path, default=None, help="Path to IDL-like EUV response SAV.")
-    p.add_argument("--channels", nargs="*", default=["94", "131", "171", "193", "211", "304", "335"])
+    p.add_argument(
+        "--ebtel-path",
+        type=str,
+        default=None,
+        help='Optional EBTEL table (.sav). Use "" to disable.',
+    )
+    p.add_argument(
+        "--response-sav",
+        type=Path,
+        default=None,
+        help="Path to IDL-like EUV response SAV.",
+    )
+    p.add_argument(
+        "--channels",
+        nargs="*",
+        default=["94", "131", "171", "193", "211", "304", "335"],
+    )
     p.add_argument("--instrument", type=str, default="AIA")
     p.add_argument("--omp-threads", type=int, default=8)
     p.add_argument("--xc", type=float, default=None)
     p.add_argument("--yc", type=float, default=None)
-    p.add_argument("--dsun-cm", type=float, default=None, help="Override model.DSun before preparing DLL inputs (cm).")
-    p.add_argument("--lonc-deg", type=float, default=None, help="Override model.lonC before preparing DLL inputs (deg).")
-    p.add_argument("--b0sun-deg", type=float, default=None, help="Override model.b0Sun before preparing DLL inputs (deg).")
+    p.add_argument(
+        "--dsun-cm",
+        type=float,
+        default=None,
+        help="Override model.DSun before preparing DLL inputs (cm).",
+    )
+    p.add_argument(
+        "--lonc-deg",
+        type=float,
+        default=None,
+        help="Override model.lonC before preparing DLL inputs (deg).",
+    )
+    p.add_argument(
+        "--b0sun-deg",
+        type=float,
+        default=None,
+        help="Override model.b0Sun before preparing DLL inputs (deg).",
+    )
     p.add_argument("--dx", type=float, default=None)
     p.add_argument("--dy", type=float, default=None)
     p.add_argument("--pixel-scale-arcsec", type=float, default=None)
     p.add_argument("--nx", type=int, default=None)
     p.add_argument("--ny", type=int, default=None)
-    p.add_argument("--xrange", type=float, nargs=2, default=None, metavar=("XMIN", "XMAX"))
-    p.add_argument("--yrange", type=float, nargs=2, default=None, metavar=("YMIN", "YMAX"))
+    p.add_argument(
+        "--xrange", type=float, nargs=2, default=None, metavar=("XMIN", "XMAX")
+    )
+    p.add_argument(
+        "--yrange", type=float, nargs=2, default=None, metavar=("YMIN", "YMAX")
+    )
     p.add_argument(
         "--out-dir",
         type=Path,
         default=DEFAULT_OUTDIR / "computeeuv_inputs_python",
         help="Directory for .npy dumps + manifest.json",
     )
-    p.add_argument("--mode", type=int, default=0, help="Corona params mode flag (passed to ComputeEUV).")
+    p.add_argument(
+        "--mode",
+        type=int,
+        default=0,
+        help="Corona params mode flag (passed to ComputeEUV).",
+    )
     return p.parse_args()
 
 
@@ -230,7 +268,15 @@ def main() -> None:
 
     print("Dumped Python ComputeEUV inputs:")
     print(f"- out_dir: {out_dir}")
-    for name in ("model", "ebtel", "response", "simbox", "coronaparms", "outspace", "shtable"):
+    for name in (
+        "model",
+        "ebtel",
+        "response",
+        "simbox",
+        "coronaparms",
+        "outspace",
+        "shtable",
+    ):
         arr = np.load(out_dir / f"{name}.npy", allow_pickle=False)
         print(f"- {name}: shape={arr.shape} dtype={arr.dtype}")
     print(f"- manifest: {out_dir / 'manifest.json'}")

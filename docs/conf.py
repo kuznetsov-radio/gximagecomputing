@@ -18,7 +18,7 @@ SRC_DIR = REPO_ROOT / "src"
 sys.path.insert(0, str(SRC_DIR))
 
 # Avoid SunPy/Matplotlib config/cache permission issues during autodoc imports.
-_tmp_root = Path(tempfile.gettempdir()) / "gximagecomputing_sphinx"
+_tmp_root = Path(tempfile.gettempdir()) / "pyGXrender_sphinx"
 for _name in ("sunpy_cfg", "mpl_cfg", "xdg_cache"):
     (_tmp_root / _name).mkdir(parents=True, exist_ok=True)
 os.environ.setdefault("SUNPY_CONFIGDIR", str(_tmp_root / "sunpy_cfg"))
