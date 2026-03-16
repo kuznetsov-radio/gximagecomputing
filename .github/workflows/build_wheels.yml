@@ -40,6 +40,24 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install cibuildwheel==2.19.1
 
+      - name: Pre-seed cibuildwheel cache
+        shell: bash
+        env:
+          CIBW_CACHE_PATH: ${{ runner.temp }}/cibw-cache
+        run: |
+          set -euo pipefail
+          mkdir -p "$CIBW_CACHE_PATH"
+          virtualenv_pyz="$CIBW_CACHE_PATH/virtualenv-20.26.2.pyz"
+
+          if [[ ! -s "$virtualenv_pyz" ]]; then
+            echo "Downloading virtualenv.pyz to $virtualenv_pyz"
+            curl -fL --retry 8 --retry-delay 5 --retry-all-errors \
+              https://bootstrap.pypa.io/virtualenv.pyz \
+              -o "$virtualenv_pyz"
+          fi
+
+          ls -lh "$virtualenv_pyz"
+
       - name: Build wheels
         shell: bash
         env:
@@ -48,6 +66,8 @@ jobs:
           CIBW_ARCHS_WINDOWS: AMD64
           # Avoid 32-bit Linux wheels (i686); we only support x86_64 in CI.
           CIBW_ARCHS_LINUX: x86_64
+          # Reuse the pre-seeded cache path to avoid flaky remote fetches.
+          CIBW_CACHE_PATH: ${{ runner.temp }}/cibw-cache
         run: |
           set -euo pipefail
           attempts=3
