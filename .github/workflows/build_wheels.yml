@@ -35,14 +35,37 @@ jobs:
         with:
           python-version: "3.12"
 
+      - name: Install cibuildwheel
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cibuildwheel==2.19.1
+
       - name: Build wheels
-        uses: pypa/cibuildwheel@v2.19.1
+        shell: bash
         env:
           # Avoid 32-bit Windows wheels (win32) which are not supported by
           # our dependency stack on CPython 3.12.
           CIBW_ARCHS_WINDOWS: AMD64
           # Avoid 32-bit Linux wheels (i686); we only support x86_64 in CI.
           CIBW_ARCHS_LINUX: x86_64
+        run: |
+          set -euo pipefail
+          attempts=3
+          for attempt in $(seq 1 "$attempts"); do
+            echo "Starting cibuildwheel attempt $attempt/$attempts"
+            if python -m cibuildwheel . --output-dir wheelhouse; then
+              exit 0
+            fi
+
+            if [[ "$attempt" -lt "$attempts" ]]; then
+              sleep_time=$((attempt * 30))
+              echo "cibuildwheel failed on attempt $attempt. Retrying in ${sleep_time}s..."
+              sleep "$sleep_time"
+            fi
+          done
+
+          echo "cibuildwheel failed after $attempts attempts"
+          exit 1
 
       - uses: actions/upload-artifact@v4
         with:
