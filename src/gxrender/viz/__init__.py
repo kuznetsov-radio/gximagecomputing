@@ -1,4 +1,4 @@
-"""Visualization helpers and viewers for gximagecomputing outputs."""
+"""Visualization helpers and viewers for gxrender outputs."""
 
 from .render_map_view import main as render_map_view_main
 

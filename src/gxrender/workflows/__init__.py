@@ -1,4 +1,4 @@
-"""High-level reusable workflows built on top of gximagecomputing core APIs."""
+"""High-level reusable workflows built on top of gxrender core APIs."""
 
 from .render_mw import main as render_mw_main
 from .render_euv import main as render_euv_main

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import ctypes
 from dataclasses import dataclass
+import warnings
 
 import numpy as np
 import scipy.io as sio
@@ -84,7 +85,7 @@ def build_default_euv_response(
 
 
 def load_euv_response_sav(path: str):
-    """Load real IDL GX response from SAV (e.g. aia_response.sav)."""
+    """Load real IDL GX response from SAV (e.g. resp_aia_20251126T153431.sav)."""
     d = sio.readsav(path, python_dict=True, verbose=False)
     gx = None
     gx_var_name = None
@@ -234,7 +235,27 @@ class GXEUVImageComputing(GXRadioImageComputing):
         exact=False,
         nthreads=0,
         shtable=None,
+        warn_defaults=True,
     ):
+        if warn_defaults:
+            if int(mode) == 0:
+                warnings.warn(
+                    "GXEUVImageComputing.synth_euv() is using mode=0. "
+                    "Pass mode explicitly for full control of the coronal-heating path.",
+                    stacklevel=2,
+                )
+            if not bool(parallel) and not bool(exact) and int(nthreads) <= 0:
+                warnings.warn(
+                    "GXEUVImageComputing.synth_euv() is using projection flags off (parallel=False, exact=False, nthreads=0). "
+                    "Pass projection controls explicitly for full control of the LOS geometry.",
+                    stacklevel=2,
+                )
+            if shtable is None:
+                warnings.warn(
+                    "GXEUVImageComputing.synth_euv() received no SHtable, so the non-SH DLL entrypoint will be used.",
+                    stacklevel=2,
+                )
+
         simbox, dt_s = self._make_euv_simbox(
             box_nx=box_nx,
             box_ny=box_ny,

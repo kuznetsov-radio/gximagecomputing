@@ -17,16 +17,15 @@ def _default_idl_file() -> Path:
 
 
 def _default_test_data_dir() -> Path:
-    return Path(
-        "/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/test_data"
-    )
+    repo_root = Path(__file__).resolve().parents[1]
+    return repo_root.parent / "pyGXrender-test-data" / "raw" / "manual_seed"
 
 
 def _import_builder(repo_root: Path):
     src_dir = repo_root / "src"
     if str(src_dir) not in sys.path:
         sys.path.insert(0, str(src_dir))
-    from gximagecomputing.io.sav_to_h5 import build_h5_from_sav
+    from gxrender.io.sav_to_h5 import build_h5_from_sav
 
     return build_h5_from_sav
 
@@ -34,8 +33,8 @@ def _import_builder(repo_root: Path):
 def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=(
-            "Seed gximagecomputing/test_data from an IDL CHR SAV file by copying to "
-            "test.chr.sav and converting to test.chr.h5."
+            "Seed an extracted gxrender fixture directory from an IDL CHR SAV file by "
+            "copying to test.chr.sav and converting to test.chr.h5."
         )
     )
     p.add_argument(
@@ -48,7 +47,7 @@ def _parse_args() -> argparse.Namespace:
         "--test-data-dir",
         type=Path,
         default=_default_test_data_dir(),
-        help="Destination test_data directory.",
+        help="Destination extracted fixture directory.",
     )
     return p.parse_args()
 

@@ -36,6 +36,20 @@ class MapGeometry:
 
 
 @dataclass(slots=True)
+class CoronalPlasmaParameters:
+    """Coronal plasma/heating parameters forwarded to the render engine."""
+
+    tbase: float | None = None
+    nbase: float | None = None
+    q0: float | None = None
+    a: float | None = None
+    b: float | None = None
+    mode: int = 0
+    selective_heating: bool = False
+    shtable: Sequence[Sequence[float]] | np.ndarray | None = None
+
+
+@dataclass(slots=True)
 class MWRenderOptions:
     model_path: str | Path
     model_format: Literal["h5", "sav", "auto"] = "auto"
@@ -43,6 +57,8 @@ class MWRenderOptions:
     output_dir: str | Path | None = None
     output_name: str | None = None
     output_format: Literal["h5", "fits", "both"] = "h5"
+    freqlist_ghz: Sequence[float] | None = None
+    plasma: CoronalPlasmaParameters | None = None
     omp_threads: int = 8
     geometry: MapGeometry | None = None
     observer: ObserverOverrides | None = None
@@ -59,8 +75,12 @@ class EUVRenderOptions:
     output_dir: str | Path | None = None
     output_name: str | None = None
     channels: Sequence[str] | None = None
-    instrument: str = "AIA"
+    instrument: str | None = None
     response_sav: str | Path | None = None
+    response: Any | None = None
+    response_dt: Any | None = None
+    response_meta: Any | None = None
+    plasma: CoronalPlasmaParameters | None = None
     omp_threads: int = 8
     geometry: MapGeometry | None = None
     observer: ObserverOverrides | None = None
@@ -119,6 +139,7 @@ class MWRenderResult:
     geometry: RenderGeometryInfo
     obs_time_iso: str
     freqlist_ghz: list[float]
+    plasma: CoronalPlasmaParameters
     ti: np.ndarray
     tv: np.ndarray
     outputs: MWOutputFiles
@@ -136,6 +157,7 @@ class EUVRenderResult:
     geometry: RenderGeometryInfo
     obs_time_iso: str
     response: EUVResponseInfo
+    plasma: CoronalPlasmaParameters
     flux_corona: np.ndarray
     flux_tr: np.ndarray
     outputs: EUVOutputFiles
@@ -166,6 +188,57 @@ def _observer_to_kwargs(observer: ObserverOverrides | None) -> dict:
     }
 
 
+def _plasma_to_kwargs(plasma: CoronalPlasmaParameters | None) -> dict:
+    if plasma is None:
+        return {
+            "tbase": None,
+            "nbase": None,
+            "q0": None,
+            "a": None,
+            "b": None,
+            "corona_mode": 0,
+            "selective_heating": False,
+            "shtable": None,
+            "shtable_path": None,
+            "force_isothermal": False,
+            "interpol_b": False,
+            "analytical_nt": False,
+        }
+
+    p = plasma
+    return {
+        "tbase": p.tbase,
+        "nbase": p.nbase,
+        "q0": p.q0,
+        "a": p.a,
+        "b": p.b,
+        "corona_mode": p.mode,
+        "selective_heating": bool(p.selective_heating),
+        "shtable": (np.asarray(p.shtable, dtype=np.float64) if p.shtable is not None else None),
+        "shtable_path": None,
+        "force_isothermal": False,
+        "interpol_b": False,
+        "analytical_nt": False,
+    }
+
+
+def _plasma_from_dict(d: dict[str, Any]) -> CoronalPlasmaParameters:
+    return CoronalPlasmaParameters(
+        tbase=float(d["tbase_k"]),
+        nbase=float(d["nbase_cm3"]),
+        q0=float(d["q0"]),
+        a=float(d["a"]),
+        b=float(d["b"]),
+        mode=int(d["mode"]),
+        selective_heating=bool(d.get("selective_heating", d.get("shtable") is not None)),
+        shtable=(
+            None
+            if d.get("shtable") is None
+            else np.asarray(d["shtable"], dtype=np.float64)
+        ),
+    )
+
+
 def _geometry_from_dict(d: dict[str, Any]) -> RenderGeometryInfo:
     return RenderGeometryInfo(
         xc_arcsec=float(d["xc_arcsec"]),
@@ -192,6 +265,7 @@ def _mw_result_from_workflow(d: dict[str, Any]) -> MWRenderResult:
         geometry=_geometry_from_dict(d["geometry"]),
         obs_time_iso=str(d["obs_time_iso"]),
         freqlist_ghz=[float(x) for x in d["freqlist_ghz"]],
+        plasma=_plasma_from_dict(d["plasma"]),
         ti=np.asarray(raw["TI"]),
         tv=np.asarray(raw["TV"]),
         outputs=MWOutputFiles(
@@ -225,6 +299,7 @@ def _euv_result_from_workflow(d: dict[str, Any]) -> EUVRenderResult:
             source=str(resp["source"]),
             mode=str(resp["mode"]),
         ),
+        plasma=_plasma_from_dict(d["plasma"]),
         flux_corona=np.asarray(raw["flux_corona"]),
         flux_tr=np.asarray(raw["flux_tr"]),
         outputs=EUVOutputFiles(
@@ -251,11 +326,13 @@ def render_mw_maps(options: MWRenderOptions) -> MWRenderResult:
         output_dir=(Path(options.output_dir) if options.output_dir is not None else _render_mw_workflow.DEFAULT_OUTDIR),
         output_name=options.output_name,
         output_format=str(options.output_format),
+        frequencies_ghz=(list(options.freqlist_ghz) if options.freqlist_ghz is not None else None),
         omp_threads=int(options.omp_threads),
         save_outputs=bool(options.save_outputs),
         write_preview=bool(options.write_preview),
         **_geometry_to_kwargs(options.geometry),
         **_observer_to_kwargs(options.observer),
+        **_plasma_to_kwargs(options.plasma),
     )
     return _mw_result_from_workflow(_render_mw_workflow.run(ns, verbose=bool(options.verbose)))
 
@@ -272,14 +349,18 @@ def render_euv_maps(options: EUVRenderOptions) -> EUVRenderResult:
         ebtel_path=options.ebtel_path,
         output_dir=(Path(options.output_dir) if options.output_dir is not None else _render_euv_workflow.DEFAULT_OUTDIR),
         output_name=options.output_name,
-        channels=list(options.channels) if options.channels is not None else ["94", "131", "171", "193", "211", "304", "335"],
-        instrument=str(options.instrument),
+        channels=(list(options.channels) if options.channels is not None else None),
+        instrument=(str(options.instrument) if options.instrument is not None else None),
         response_sav=(Path(options.response_sav) if options.response_sav is not None else None),
+        response=options.response,
+        response_dt=options.response_dt,
+        response_meta=options.response_meta,
         omp_threads=int(options.omp_threads),
         save_outputs=bool(options.save_outputs),
         write_preview=bool(options.write_preview),
         **_geometry_to_kwargs(options.geometry),
         **_observer_to_kwargs(options.observer),
+        **_plasma_to_kwargs(options.plasma),
     )
     return _euv_result_from_workflow(_render_euv_workflow.run(ns, verbose=bool(options.verbose)))
 
@@ -287,6 +368,7 @@ def render_euv_maps(options: EUVRenderOptions) -> EUVRenderResult:
 __all__ = [
     "ObserverOverrides",
     "MapGeometry",
+    "CoronalPlasmaParameters",
     "MWRenderOptions",
     "EUVRenderOptions",
     "RenderGeometryInfo",

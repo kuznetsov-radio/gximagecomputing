@@ -1,3 +1,26 @@
+function dumpcomputeeuvinputs__testdata_root
+  compile_opt idl2
+  root=getenv('GXRENDER_TEST_DATA_ROOT')
+  if strtrim(root, 2) eq '' then root=getenv('GXIMAGECOMPUTING_TEST_DATA_ROOT')
+  if strtrim(root, 2) ne '' then begin
+    root=file_expand_path(root)
+    if file_test(root+'/raw', /directory) and file_test(root+'/scripts', /directory) then return, root+'/raw'
+    return, root
+  endif
+
+  exdir=file_dirname(routine_filepath('DumpComputeEUVInputs'))
+  repodir=file_dirname(exdir)
+  return, file_expand_path(repodir+'/../pyGXrender-test-data/raw')
+end
+
+function dumpcomputeeuvinputs__find_fixture, root, category, pattern
+  compile_opt idl2
+  files=file_search(root+'/'+category+'/*/'+pattern, count=nfiles)
+  if nfiles eq 0 then files=file_search(root+'/'+category+'/'+pattern, count=nfiles)
+  if nfiles eq 0 then return, ''
+  return, files[0]
+end
+
 pro DumpComputeEUVInputs, MODelfile=modelfile, EBTELfile=ebtelfile, RESPonsefile=responsefile, $
                          DSUN=dsun_kw, LONC=lonc_kw, B0SUN=b0sun_kw, $
                          INSTRument=instrument, XC=xc, YC=yc, DX=dx, DY=dy, NX=nx, NY=ny, $
@@ -8,17 +31,26 @@ pro DumpComputeEUVInputs, MODelfile=modelfile, EBTELfile=ebtelfile, RESPonsefile
   repodir=file_dirname(exdir)
   local_idlcodedir=repodir+'/idlcode'
   env_ebtel=getenv('GXIMAGECOMPUTING_EBTEL_PATH')
+  testdata_root=dumpcomputeeuvinputs__testdata_root()
 
   if n_elements(modelfile) eq 0 then begin
-    modelfile=repodir+'/test_data/test.chr.sav'
+    modelfile=dumpcomputeeuvinputs__find_fixture(testdata_root, 'models', 'test.chr.sav')
+    if strtrim(modelfile, 2) eq '' then message, 'Could not locate test.chr.sav under '+testdata_root
   endif
   if n_elements(ebtelfile) eq 0 then begin
-    if n_elements(env_ebtel) gt 0 then ebtelfile=env_ebtel else ebtelfile=''
+    if n_elements(env_ebtel) gt 0 then begin
+      ebtelfile=env_ebtel
+    endif else begin
+      ebtelfile=dumpcomputeeuvinputs__find_fixture(testdata_root, 'ebtel', 'ebtel.sav')
+    endelse
   endif
   if n_elements(instrument) eq 0 then instrument='aia'
   if n_elements(dx) eq 0 then dx=2.0
   if n_elements(dy) eq 0 then dy=2.0
   if n_elements(outfile) eq 0 then outfile='/tmp/gximagecomputing_validation_groundtruth/computeeuv_inputs_idl.sav'
+  if n_elements(responsefile) eq 0 then begin
+    responsefile=dumpcomputeeuvinputs__find_fixture(testdata_root, 'responses', 'resp_'+strlowcase(instrument)+'_*.sav')
+  endif
 
   ; Ensure local helper routines are preferred.
   if file_test(local_idlcodedir, /directory) then begin
@@ -65,7 +97,7 @@ pro DumpComputeEUVInputs, MODelfile=modelfile, EBTELfile=ebtelfile, RESPonsefile
 
   ebtel=LoadEBTEL(ebtelfile)
 
-  if n_elements(responsefile) gt 0 then begin
+  if n_elements(responsefile) gt 0 and strtrim(responsefile, 2) ne '' then begin
     restore, responsefile
     if n_elements(gxresponse) gt 0 then response=gxresponse
     if n_elements(response) eq 0 then begin
@@ -73,7 +105,7 @@ pro DumpComputeEUVInputs, MODelfile=modelfile, EBTELfile=ebtelfile, RESPonsefile
       return
     endif
   endif else begin
-    response=LoadEUVresponse(model, instrument=instrument)
+    response=LoadEUVresponse(model.obstime, instrument=instrument)
   endelse
 
   simbox=MakeSimulationBoxEUV(xc, yc, dx, dy, nx, ny)

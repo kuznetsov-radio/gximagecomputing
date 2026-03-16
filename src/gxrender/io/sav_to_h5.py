@@ -322,7 +322,8 @@ def build_h5_from_sav(sav_path: Path, out_h5: Path, template_h5: Path | None = N
     has_lines = _has_field(box, "STARTIDX") and _has_field(box, "ENDIDX") and _has_field(box, "AVFIELD")
     has_chromo = _has_field(box, "CHROMO_BCUBE") and _has_field(box, "CHROMO_IDX")
 
-    with h5py.File(out_h5, "w") as f:
+    file_mode = "r+" if template_h5 is not None else "w"
+    with h5py.File(out_h5, file_mode) as f:
         g_base = _ensure_group(f, "base")
         g_refmaps = _ensure_group(f, "refmaps")
         g_grid = _ensure_group(f, "grid")

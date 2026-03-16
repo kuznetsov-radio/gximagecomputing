@@ -13,7 +13,7 @@ pip install pyGXrender
 and receive a wheel containing the compiled `RenderGRFF` extension for their platform (instead of building locally).
 
 Note: the PyPI distribution name is `pyGXrender`, while the Python import
-package remains `gximagecomputing`.
+package is `gxrender`.
 
 ## One-Time PyPI Setup
 
@@ -104,7 +104,7 @@ Then verify install from TestPyPI:
 ```bash
 python -m pip install --upgrade pip
 python -m pip install --index-url https://test.pypi.org/simple/ --extra-index-url https://pypi.org/simple pyGXrender
-python -c "import gximagecomputing; print('ok', gximagecomputing.__file__)"
+python -c "import gxrender; print('ok', gxrender.__file__)"
 gxrender-mw --help
 ```
 
@@ -115,7 +115,7 @@ In a clean environment:
 ```bash
 python -m pip install --upgrade pip
 python -m pip install pyGXrender
-python -c "import gximagecomputing; print('ok', gximagecomputing.__file__)"
+python -c "import gxrender; print('ok', gxrender.__file__)"
 gxrender-mw --help
 ```
 

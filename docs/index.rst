@@ -1,8 +1,8 @@
-gximagecomputing Documentation
-==============================
+gxrender Documentation
+======================
 
 This is a lightweight Sphinx documentation entry point for ``pyGXrender`` /
-``gximagecomputing``. It complements the top-level ``README.md`` with
+``gxrender``. It complements the top-level ``README.md`` with
 generated API pages for the SDK and CLI/viewer modules.
 
 .. toctree::

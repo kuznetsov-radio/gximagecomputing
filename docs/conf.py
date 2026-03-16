@@ -1,4 +1,4 @@
-"""Sphinx configuration for gximagecomputing."""
+"""Sphinx configuration for gxrender."""
 
 from __future__ import annotations
 
@@ -7,10 +7,10 @@ import sys
 import tempfile
 from pathlib import Path
 
-project = "pyGXrender / gximagecomputing"
+project = "pyGXrender / gxrender"
 author = "suncast-org"
 copyright = "2026, suncast-org"
-release = "0.0.2.1"
+release = "0.0.2.3"
 
 DOCS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = DOCS_DIR.parent

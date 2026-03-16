@@ -14,8 +14,8 @@ from scipy.io import readsav
 
 
 DEFAULT_OUTDIR = Path(tempfile.gettempdir()) / "gximagecomputing_validation_groundtruth"
-DEFAULT_PY_H5 = DEFAULT_OUTDIR / "test.chr.sav_py_mw_maps.h5"
-DEFAULT_IDL_SAV = DEFAULT_OUTDIR / "idl_mw_maps.sav"
+DEFAULT_PY_H5 = DEFAULT_OUTDIR / "test.chr.h5_py_mw_maps.h5"
+DEFAULT_IDL_SAV = DEFAULT_OUTDIR / "test.chr.sav_idl_mw_maps.sav"
 
 
 def _percent_diff(test: np.ndarray, truth: np.ndarray, eps: float = 1e-12) -> np.ndarray:

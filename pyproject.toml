@@ -44,7 +44,7 @@ Repository = "https://github.com/kuznetsov-radio/gximagecomputing/"
 [tool.cibuildwheel]
 skip = ["cp36*", "cp37*", "cp38*", "cp39*", "cp310*","cp311*", "pp*", "*musl*"]
 build-frontend = "build"
-test-command = "python -c \"from gximagecomputing.radio import GXRadioImageComputing; GXRadioImageComputing(); print('wheel-ok')\""
+test-command = "python -c \"from gxrender.radio import GXRadioImageComputing; GXRadioImageComputing(); print('wheel-ok')\""
 
 [[tool.cibuildwheel.overrides]]
 select = "cp*"
@@ -81,10 +81,10 @@ LDFLAGS = "-L$(brew --prefix libomp)/lib"
 [tool.cibuildwheel.windows]
 
 [project.scripts]
-gxrender-map-view = "gximagecomputing.viz.render_map_view:main"
-gxrender-mw = "gximagecomputing.workflows.render_mw:main"
-gxrender-euv = "gximagecomputing.workflows.render_euv:main"
-gx-sav2h5 = "gximagecomputing.io.sav_to_h5:main"
+gxrender-map-view = "gxrender.viz.render_map_view:main"
+gxrender-mw = "gxrender.workflows.render_mw:main"
+gxrender-euv = "gxrender.workflows.render_euv:main"
+gx-sav2h5 = "gxrender.io.sav_to_h5:main"
 [tool.setuptools]
 package-dir = {"" = "src"}
 

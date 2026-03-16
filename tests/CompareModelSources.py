@@ -19,7 +19,8 @@ from typing import Any, Dict
 
 import numpy as np
 
-from gximagecomputing.radio import GXRadioImageComputing
+from gxrender.radio import GXRadioImageComputing
+from gxrender.utils.test_data import find_model_file
 
 
 def _is_numeric(arr: np.ndarray) -> bool:
@@ -160,13 +161,13 @@ def parse_args():
     parser.add_argument(
         "--h5-path",
         type=Path,
-        default=Path(__file__).resolve().parents[1] / "test_data" / "test.chr.h5",
+        default=None,
         help="Path to CHR HDF5 file.",
     )
     parser.add_argument(
         "--sav-path",
         type=Path,
-        default=Path(__file__).resolve().parents[1] / "test_data" / "test.chr.sav",
+        default=None,
         help="Path to CHR SAV file.",
     )
     parser.add_argument(
@@ -186,6 +187,10 @@ def parse_args():
 
 def main() -> None:
     args = parse_args()
+    if args.h5_path is None:
+        args.h5_path = find_model_file("test.chr.h5")
+    if args.sav_path is None:
+        args.sav_path = find_model_file("test.chr.sav")
     if args.output_json is None:
         args.output_json = Path(tempfile.gettempdir()) / f"gximage_model_compare_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
     args.output_json.parent.mkdir(parents=True, exist_ok=True)
