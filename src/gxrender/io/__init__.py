@@ -1,4 +1,4 @@
-"""I/O helpers for pyGXrender models, EBTEL tables, and rendered map products."""
+"""I/O helpers for gxrender models, EBTEL tables, and rendered map products."""
 
 __all__ = [
     "resolve_ebtel_path",
@@ -66,4 +66,4 @@ def __getattr__(name):
         from .voxel_id import gx_box2id, gx_voxelid
 
         return {"gx_box2id": gx_box2id, "gx_voxelid": gx_voxelid}[name]
-    raise AttributeError(f"module 'pyGXrender.io' has no attribute {name!r}")
+    raise AttributeError(f"module 'gxrender.io' has no attribute {name!r}")

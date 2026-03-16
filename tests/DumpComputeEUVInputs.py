@@ -16,16 +16,26 @@ if not os.environ.get("SUNPY_CONFIGDIR"):
     _sunpy_cfg.mkdir(parents=True, exist_ok=True)
     os.environ["SUNPY_CONFIGDIR"] = str(_sunpy_cfg)
 
-from pyGXrender.euv import (
-    GXEUVImageComputing,
-    build_default_euv_response,
-    load_euv_response_sav,
-)
-from pyGXrender.workflows._render_common import (
-    DEFAULT_OUTDIR,
-    plasma_defaults,
-    prepare_common_inputs,
-)
+from gxrender.euv import GXEUVImageComputing, load_euv_response_sav
+from gxrender.utils.test_data import find_model_file, test_data_setup_hint, try_find_response_file
+from gxrender.workflows._render_common import DEFAULT_OUTDIR, prepare_common_inputs
+
+
+def _example_default_shtable() -> np.ndarray:
+    weights = np.array([1.0, 1.0, 1.0, 1.1, 1.2, 1.3, 1.4], dtype=np.float64)
+    shtable = np.outer(weights, weights)
+    shtable[6, 6] = 0.1
+    return shtable
+
+
+def _example_plasma_defaults() -> dict[str, float]:
+    return {
+        "tbase": 1e6,
+        "nbase": 1e8,
+        "q0": 0.0217,
+        "a": 0.3,
+        "b": 2.7,
+    }
 
 
 def _build_coronaparms_dtype() -> np.dtype:
@@ -47,25 +57,11 @@ def _resolve_default_response_sav(instrument: str) -> Path | None:
         p = Path(env_path).expanduser()
         if p.exists():
             return p
+        raise FileNotFoundError(f"GXIMAGECOMPUTING_EUV_RESPONSE_SAV points to a missing file: {p}")
 
-    ssw = os.environ.get("SSW", "").strip()
-    if not ssw:
-        return None
-
-    base = Path(ssw).expanduser() / "packages" / "gx_simulator" / "euv"
-    inst = str(instrument).strip().lower()
-    name_by_inst = {
-        "aia": "aia_response.sav",
-        "aia2": "aia_response.sav",
-        "trace": "trace_response.sav",
-        "sxt": "sxt_response.sav",
-    }
-    fname = name_by_inst.get(inst)
-    if fname is None:
-        return None
-    for p in (base / fname, base / "response" / fname, base / "responses" / fname):
-        if p.exists():
-            return p
+    repo_response = try_find_response_file(instrument)
+    if repo_response is not None:
+        return repo_response
     return None
 
 
@@ -90,13 +86,8 @@ def _build_coronaparms(
 
 
 def _parse_args() -> argparse.Namespace:
-    repo_root = Path(__file__).resolve().parents[1]
-    p = argparse.ArgumentParser(
-        description="Dump exact ComputeEUV inputs (Python side) before the DLL call."
-    )
-    p.add_argument(
-        "--model-path", type=Path, default=repo_root / "test_data" / "test.chr.sav"
-    )
+    p = argparse.ArgumentParser(description="Dump exact ComputeEUV inputs (Python side) before the DLL call.")
+    p.add_argument("--model-path", type=Path, default=None)
     p.add_argument("--model-format", choices=["h5", "sav", "auto"], default="auto")
     p.add_argument(
         "--ebtel-path",
@@ -169,15 +160,13 @@ def _save_array(out_dir: Path, name: str, arr: np.ndarray) -> None:
 
 def main() -> None:
     args = _parse_args()
-    common = prepare_common_inputs(
-        args,
-        prefer_execute_center=False,
-        observer_overrides={
-            "dsun_cm": args.dsun_cm,
-            "lonc_deg": args.lonc_deg,
-            "b0sun_deg": args.b0sun_deg,
-        },
-    )
+    if args.model_path is None:
+        args.model_path = find_model_file("test.chr.sav")
+    if args.ebtel_path is None:
+        args.ebtel_path = ""
+    if args.pixel_scale_arcsec is None and args.dx is None and args.dy is None:
+        args.pixel_scale_arcsec = 2.0
+    common = prepare_common_inputs(args, prefer_execute_center=False)
 
     if args.response_sav is not None:
         response_path = str(args.response_sav)
@@ -190,19 +179,19 @@ def main() -> None:
             response, response_dt, response_meta = load_euv_response_sav(response_path)
             response_source_mode = "auto_sav"
         else:
-            response_path = ""
-            response, response_dt, response_meta = build_default_euv_response(
-                instrument=args.instrument, channels=[str(c) for c in args.channels]
+            raise FileNotFoundError(
+                "No explicit EUV response SAV was provided, and no default response fixture could be found. "
+                + test_data_setup_hint(f"EUV response file for instrument {str(args.instrument).strip().lower()!r}")
+                + " You may also set GXIMAGECOMPUTING_EUV_RESPONSE_SAV to an explicit SAV file."
             )
-            response_source_mode = "synthetic_fallback"
 
-    plasma = plasma_defaults()
+    plasma = _example_plasma_defaults()
     coronaparms, coronaparms_dt = _build_coronaparms(
-        tbase=plasma.tbase,
-        nbase=plasma.nbase,
-        q0=plasma.q0,
-        a=plasma.a,
-        b=plasma.b,
+        tbase=plasma["tbase"],
+        nbase=plasma["nbase"],
+        q0=plasma["q0"],
+        a=plasma["a"],
+        b=plasma["b"],
         mode=int(args.mode),
     )
 
@@ -233,7 +222,7 @@ def main() -> None:
     _save_array(out_dir, "simbox", np.asarray(simbox))
     _save_array(out_dir, "coronaparms", np.asarray(coronaparms))
     _save_array(out_dir, "outspace", np.asarray(outspace))
-    _save_array(out_dir, "shtable", np.asarray(plasma.shtable, dtype=np.float64))
+    _save_array(out_dir, "shtable", _example_default_shtable())
 
     manifest = {
         "inputs": {
@@ -264,7 +253,7 @@ def main() -> None:
             "simbox_dtype": np.asarray(simbox).dtype.descr,
             "coronaparms_dtype": np.asarray(coronaparms).dtype.descr,
             "outspace_dtype": np.asarray(outspace).dtype.descr,
-            "shtable_shape": list(np.asarray(plasma.shtable).shape),
+            "shtable_shape": [7, 7],
         },
         "internal_dtypes": {
             "response_dt": response_dt.descr,

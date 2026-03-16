@@ -9,6 +9,7 @@ __all__ = [
     "build_h5_from_sav",
     "ObserverOverrides",
     "MapGeometry",
+    "CoronalPlasmaParameters",
     "MWRenderOptions",
     "EUVRenderOptions",
     "RenderGeometryInfo",
@@ -47,6 +48,7 @@ def __getattr__(name):
     if name in {
         "ObserverOverrides",
         "MapGeometry",
+        "CoronalPlasmaParameters",
         "MWRenderOptions",
         "EUVRenderOptions",
         "RenderGeometryInfo",
@@ -62,4 +64,4 @@ def __getattr__(name):
 
         return getattr(_sdk, name)
 
-    raise AttributeError(f"module 'pyGXrender' has no attribute {name!r}")
+    raise AttributeError(f"module 'gxrender' has no attribute {name!r}")

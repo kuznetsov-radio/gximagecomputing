@@ -11,7 +11,7 @@ import ComparePythonVsIDLMaps as base
 DEFAULT_OUTDIR = Path(tempfile.gettempdir()) / "gximagecomputing_validation_groundtruth"
 
 # Repoint defaults to EUV artifacts while reusing the shared comparison implementation.
-base.DEFAULT_PY_H5 = DEFAULT_OUTDIR / "test.chr.sav_py_euv_maps.h5"
+base.DEFAULT_PY_H5 = DEFAULT_OUTDIR / "test.chr.h5_py_euv_maps.h5"
 base.DEFAULT_IDL_SAV = DEFAULT_OUTDIR / "test.chr.sav_idl_euv_maps.sav"
 
 

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 import argparse
+from datetime import datetime
 import re
 from pathlib import Path
 
+import astropy.units as u
 import h5py
 import matplotlib.pyplot as plt
 import numpy as np
@@ -47,8 +49,95 @@ def _extract_entries_from_map_container(container) -> list[dict]:
             continue
         data = np.asarray(data_cell[0], dtype=np.float64)
         map_id = _decode_scalar(np.atleast_1d(mp["ID"])[0])
-        entries.append({"id": map_id, "data": data, "index": int(i)})
+        entry = {"id": map_id, "data": data, "index": int(i)}
+        for key in ("XC", "YC", "DX", "DY", "TIME", "B0", "L0", "RSUN", "ROLL_ANGLE", "UNITS", "XUNITS", "YUNITS"):
+            if key in mp.dtype.names:
+                val = np.atleast_1d(mp[key])[0]
+                if key in {"TIME", "UNITS", "XUNITS", "YUNITS"}:
+                    entry[key.lower()] = _decode_scalar(val)
+                else:
+                    try:
+                        entry[key.lower()] = float(val)
+                    except Exception:
+                        pass
+        entries.append(entry)
     return entries
+
+
+def _parse_idl_time_to_iso(text: str) -> str:
+    value = (text or "").strip()
+    if not value:
+        return ""
+    for fmt in ("%d-%b-%Y %H:%M:%S.%f", "%d-%b-%Y %H:%M:%S"):
+        try:
+            dt = datetime.strptime(value, fmt)
+            return dt.strftime("%Y-%m-%dT%H:%M:%S.%f").rstrip("0").rstrip(".")
+        except Exception:
+            continue
+    return value
+
+
+def _derive_dsun_obs_m(rsun_arcsec: float, rsun_ref_m: float = 696000000.0) -> float | None:
+    if not np.isfinite(rsun_arcsec) or rsun_arcsec <= 0:
+        return None
+    angle = np.deg2rad(rsun_arcsec / 3600.0)
+    if angle <= 0:
+        return None
+    return float(rsun_ref_m / np.tan(angle))
+
+
+def _build_header_from_idl_map_entry(entry: dict) -> tuple[str, str, str]:
+    data = np.asarray(entry["data"], dtype=np.float64)
+    ny, nx = data.shape
+    xc = float(entry.get("xc", 0.0))
+    yc = float(entry.get("yc", 0.0))
+    dx = float(entry.get("dx", 1.0))
+    dy = float(entry.get("dy", 1.0))
+    b0 = entry.get("b0", None)
+    l0 = entry.get("l0", None)
+    rsun_arcsec = entry.get("rsun", None)
+    roll_angle = float(entry.get("roll_angle", 0.0) or 0.0)
+    date_obs = _parse_idl_time_to_iso(str(entry.get("time", "")))
+    bunit = str(entry.get("units", "") or "")
+
+    hdr = fits.Header()
+    hdr["NAXIS"] = 2
+    hdr["NAXIS1"] = int(nx)
+    hdr["NAXIS2"] = int(ny)
+    hdr["CTYPE1"] = "HPLN-TAN"
+    hdr["CTYPE2"] = "HPLT-TAN"
+    hdr["CUNIT1"] = "arcsec"
+    hdr["CUNIT2"] = "arcsec"
+    hdr["CRPIX1"] = (nx + 1.0) / 2.0
+    hdr["CRPIX2"] = (ny + 1.0) / 2.0
+    hdr["CRVAL1"] = xc
+    hdr["CRVAL2"] = yc
+    hdr["CDELT1"] = dx
+    hdr["CDELT2"] = dy
+    if abs(roll_angle) > 0:
+        hdr["CROTA2"] = roll_angle
+    if date_obs:
+        hdr["DATE-OBS"] = date_obs
+    if bunit:
+        hdr["BUNIT"] = bunit
+    if b0 is not None:
+        hdr["B0"] = float(b0)
+        hdr["SOLAR_B0"] = float(b0)
+        hdr["HGLT_OBS"] = float(b0)
+    if l0 is not None:
+        hdr["L0"] = float(l0)
+        hdr["SOLAR_L0"] = float(l0)
+        hdr["HGLN_OBS"] = float(l0)
+    if rsun_arcsec is not None:
+        hdr["RSUN_OBS"] = float(rsun_arcsec)
+        hdr["RSUN"] = float(rsun_arcsec)
+        hdr["RSUN_ARC"] = float(rsun_arcsec)
+        hdr["RSUN_REF"] = 696000000.0
+        dsun_obs_m = _derive_dsun_obs_m(float(rsun_arcsec))
+        if dsun_obs_m is not None:
+            hdr["DSUN_OBS"] = dsun_obs_m
+    header_text = hdr.tostring(sep="\n", endcard=False, padding=False)
+    return header_text, date_obs, ""
 
 
 def _classify_combined_entries(entries: list[dict]) -> tuple[list[dict], list[dict], str | None]:
@@ -102,14 +191,22 @@ def _read_render_h5(path: Path) -> _ViewerData:
 
         maps = f["maps"]
         meta = f.get("metadata")
+        wcs_header = _decode_scalar(meta["wcs_header"][()]) if meta is not None and "wcs_header" in meta else ""
         index_header = _decode_scalar(meta["index_header"][()]) if meta is not None and "index_header" in meta else ""
         date_obs = _decode_scalar(meta["date_obs"][()]) if meta is not None and "date_obs" in meta else ""
+        observer_name = _decode_scalar(meta["observer_name"][()]) if meta is not None and "observer_name" in meta else ""
+
+        header_text = wcs_header or index_header
 
         bunit = ""
-        if index_header:
+        if header_text:
             try:
-                hdr = fits.Header.fromstring(index_header, sep="\n")
+                hdr = fits.Header.fromstring(header_text, sep="\n")
                 bunit = str(hdr.get("BUNIT", ""))
+                if not date_obs:
+                    date_obs = str(hdr.get("DATE-OBS", ""))
+                if not observer_name:
+                    observer_name = str(hdr.get("OBSERVER", ""))
             except Exception:
                 pass
 
@@ -134,7 +231,8 @@ def _read_render_h5(path: Path) -> _ViewerData:
                 right_cmap="coolwarm",
                 bunit=bunit or "K",
                 date_obs=date_obs,
-                index_header=index_header,
+                index_header=header_text,
+                observer_name=observer_name,
             )
 
         if "channel_ids" in maps:
@@ -163,7 +261,8 @@ def _read_render_h5(path: Path) -> _ViewerData:
                 right_cmap="magma",
                 bunit=bunit or "DN s^-1 pix^-1",
                 date_obs=date_obs,
-                index_header=index_header,
+                index_header=header_text,
+                observer_name=observer_name,
             )
 
     raise ValueError(f"{path} H5 maps container is neither MW (freqlist_ghz) nor EUV (channel_ids).")
@@ -183,6 +282,7 @@ def _read_render_sav(path: Path) -> _ViewerData:
                 raise ValueError(f"MW SAV TI/TV shape mismatch: {left_cube.shape} vs {right_cube.shape}")
             if freqs.shape != freqs2.shape or not np.allclose(freqs, freqs2, atol=1e-6, rtol=0):
                 raise ValueError("MW SAV TI/TV frequency mismatch")
+            header_text, date_obs, observer_name = _build_header_from_idl_map_entry(left_entries[0])
             return _ViewerData(
                 kind="mw",
                 left_cube=left_cube,
@@ -194,15 +294,17 @@ def _read_render_sav(path: Path) -> _ViewerData:
                 right_label="TV",
                 left_cmap="inferno",
                 right_cmap="coolwarm",
-                bunit="K",
-                date_obs="",
-                index_header="",
+                bunit=str(left_entries[0].get("units", "K") or "K"),
+                date_obs=date_obs,
+                index_header=header_text,
+                observer_name=observer_name,
             )
         if kind == "euv":
             tr_cube, channels = _stack_entries_by_channel(left_entries)
             cor_cube, channels2 = _stack_entries_by_channel(right_entries, channel_order=channels)
             if tr_cube.shape != cor_cube.shape:
                 raise ValueError(f"EUV SAV TR/Corona shape mismatch: {tr_cube.shape} vs {cor_cube.shape}")
+            header_text, date_obs, observer_name = _build_header_from_idl_map_entry(left_entries[0])
             return _ViewerData(
                 kind="euv",
                 left_cube=tr_cube,
@@ -214,9 +316,10 @@ def _read_render_sav(path: Path) -> _ViewerData:
                 right_label="GX (Corona)",
                 left_cmap="magma",
                 right_cmap="magma",
-                bunit="DN s^-1 pix^-1",
-                date_obs="",
-                index_header="",
+                bunit=str(left_entries[0].get("units", "DN s^-1 pix^-1") or "DN s^-1 pix^-1"),
+                date_obs=date_obs,
+                index_header=header_text,
+                observer_name=observer_name,
             )
         raise ValueError(f"Unsupported combined IDL map container in {path}")
 
@@ -229,6 +332,7 @@ def _read_render_sav(path: Path) -> _ViewerData:
             e["channel"] = _extract_channel_from_id(e["id"], str(e["index"]))
         tr_cube, channels = _stack_entries_by_channel(tr_entries)
         cor_cube, channels2 = _stack_entries_by_channel(cor_entries, channel_order=channels)
+        header_text, date_obs, observer_name = _build_header_from_idl_map_entry(tr_entries[0])
         return _ViewerData(
             kind="euv",
             left_cube=tr_cube,
@@ -240,9 +344,10 @@ def _read_render_sav(path: Path) -> _ViewerData:
             right_label="GX (Corona)",
             left_cmap="magma",
             right_cmap="magma",
-            bunit="DN s^-1 pix^-1",
-            date_obs="",
-            index_header="",
+            bunit=str(tr_entries[0].get("units", "DN s^-1 pix^-1") or "DN s^-1 pix^-1"),
+            date_obs=date_obs,
+            index_header=header_text,
+            observer_name=observer_name,
         )
 
     raise ValueError(f"Unsupported IDL save format in {path}. Expected top-level map or mapcorona/maptr.")
@@ -281,9 +386,14 @@ def _build_2d_wcs_meta(index_header: str, nx: int, ny: int, date_obs: str, bunit
         hdr = fits.Header.fromstring(index_header, sep="\n")
     except Exception:
         return meta
-    for k in ("CTYPE1", "CTYPE2", "CUNIT1", "CUNIT2", "CDELT1", "CDELT2", "CRPIX1", "CRPIX2", "CRVAL1", "CRVAL2", "BUNIT"):
-        if k in hdr:
-            meta[k.lower()] = hdr[k]
+    for key, value in hdr.items():
+        ku = str(key).upper()
+        if ku.startswith(("NAXIS3", "NAXIS4", "CTYPE3", "CTYPE4", "CUNIT3", "CUNIT4", "CDELT3", "CDELT4", "CRPIX3", "CRPIX4", "CRVAL3", "CRVAL4", "PC3_", "PC4_", "CD3_", "CD4_")):
+            continue
+        meta[str(key).lower()] = value
+    meta["naxis"] = 2
+    meta["naxis1"] = int(nx)
+    meta["naxis2"] = int(ny)
     if "DATE-OBS" in hdr and not meta["date-obs"]:
         meta["date-obs"] = hdr["DATE-OBS"]
     return meta
@@ -345,12 +455,12 @@ def _axis_display(data: _ViewerData, idx: int) -> str:
     return f"AIA {data['axis_labels'][idx]}"
 
 
-def _title(path: Path, panel_label: str, axis_text: str, date_obs: str) -> str:
+def _title(path: Path, panel_label: str, axis_text: str, date_obs: str, observer_suffix: str = "") -> str:
     dt = f"\n{date_obs}" if date_obs else ""
-    return f"{path.name} | {panel_label} @ {axis_text}{dt}"
+    return f"{panel_label} @ {axis_text}{dt}{observer_suffix}"
 
 
-def run_viewer(path: Path, start_index: int = 0) -> None:
+def run_viewer(path: Path, start_index: int = 0, grid_deg: float = 10.0) -> None:
     data = _read_render_file(path)
     left_cube = np.asarray(data["left_cube"], dtype=np.float64)
     right_cube = np.asarray(data["right_cube"], dtype=np.float64)
@@ -370,6 +480,10 @@ def run_viewer(path: Path, start_index: int = 0) -> None:
         date_obs=str(data.get("date_obs", "")),
         bunit=str(data.get("bunit", "")),
     )
+    observer_suffix = ""
+    observer_name = str(data.get("observer_name", "") or "").strip()
+    if observer_name and observer_name.lower() != "earth":
+        observer_suffix = f" | observer={observer_name}"
     idx0 = int(np.clip(start_index, 0, n - 1))
 
     left_min, left_max = _safe_minmax(left_cube)
@@ -425,10 +539,17 @@ def run_viewer(path: Path, start_index: int = 0) -> None:
         norm=_norm_for_data(right_data, right_init_min, right_init_max, log=False),
         interpolation="nearest",
     )
+    if float(grid_deg) > 0:
+        grid_spacing = float(grid_deg) * u.deg
+        try:
+            m_left0.draw_grid(axes=ax_left, grid_spacing=grid_spacing, annotate=False)
+            m_right0.draw_grid(axes=ax_right, grid_spacing=grid_spacing, annotate=False)
+        except Exception:
+            pass
 
     axis_text = _axis_display(data, idx0)
-    ax_left.set_title(_title(path, str(data["left_label"]), axis_text, str(data.get("date_obs", ""))))
-    ax_right.set_title(_title(path, str(data["right_label"]), axis_text, str(data.get("date_obs", ""))))
+    ax_left.set_title(_title(path, str(data["left_label"]), axis_text, str(data.get("date_obs", "")), observer_suffix))
+    ax_right.set_title(_title(path, str(data["right_label"]), axis_text, str(data.get("date_obs", "")), observer_suffix))
     ax_left.set_xlabel("Solar X [arcsec]")
     ax_left.set_ylabel("Solar Y [arcsec]")
     ax_right.set_xlabel("Solar X [arcsec]")
@@ -491,8 +612,8 @@ def run_viewer(path: Path, start_index: int = 0) -> None:
         right_info.set_text(f"{data['right_label']} range [{data['bunit']}]: ({right_vmin:.3g}, {right_vmax:.3g})")
 
         axis_text = _axis_display(data, idx)
-        ax_left.set_title(_title(path, str(data["left_label"]), axis_text, str(data.get("date_obs", ""))))
-        ax_right.set_title(_title(path, str(data["right_label"]), axis_text, str(data.get("date_obs", ""))))
+        ax_left.set_title(_title(path, str(data["left_label"]), axis_text, str(data.get("date_obs", "")), observer_suffix))
+        ax_right.set_title(_title(path, str(data["right_label"]), axis_text, str(data.get("date_obs", "")), observer_suffix))
         fig.canvas.draw_idle()
 
     def _on_axis(v):
@@ -521,12 +642,13 @@ def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="Interactive viewer for rendered MW/EUV map files (.h5 or IDL .sav).")
     p.add_argument("map_path", type=Path, help="Path to rendered map file (.h5/.hdf5/.sav/.xdr).")
     p.add_argument("--start-index", type=int, default=0, help="Initial frequency/channel index.")
+    p.add_argument("--grid-deg", type=float, default=10.0, help="Solar grid spacing in degrees. Use 0 to disable.")
     return p.parse_args()
 
 
 def main() -> None:
     args = parse_args()
-    run_viewer(args.map_path.expanduser().resolve(), start_index=args.start_index)
+    run_viewer(args.map_path.expanduser().resolve(), start_index=args.start_index, grid_deg=args.grid_deg)
 
 
 if __name__ == "__main__":

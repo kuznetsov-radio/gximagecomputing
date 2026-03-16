@@ -57,7 +57,7 @@ source_files.append("pyinit.cpp")
 
 # Define the extension module
 render_grff_module = Extension(
-    "pyGXrender.RenderGRFF",
+    'gxrender.RenderGRFF',
     sources=source_files,
     extra_compile_args=extra_compile,
     extra_link_args=extra_link,
@@ -66,4 +66,8 @@ render_grff_module = Extension(
     language="c++",
 )
 
-setup(name="pyGXrender", ext_modules=[render_grff_module], include_package_data=True)
+setup(
+    name="pyGXrender",
+    ext_modules=[render_grff_module],
+    include_package_data=True
+)

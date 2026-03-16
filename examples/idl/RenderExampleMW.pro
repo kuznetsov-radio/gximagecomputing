@@ -2,6 +2,9 @@ pro RenderExampleMW, MODelfile=modelfile, EBTELfile=ebtelfile, LIBname=libname, 
                    IDLCODEdir=idlcodedir, $
                    OUTdir=outdir, OUTfile=outfile, $
                    DSUN=dsun_kw, LONC=lonc_kw, B0SUN=b0sun_kw, $
+                   observer_name=observer_name_kw, recompute_observer_ephemeris=recompute_observer_ephemeris, $
+                   AUTO_FOV=auto_fov, $
+                   USE_SAVED_FOV=use_saved_fov, $
                    XC=xc, YC=yc, DX=dx, DY=dy, NX=nx, NY=ny, XRANGE=xrange, YRANGE=yrange, $
                    NO_PLOT=no_plot,_extra=_extra
 
@@ -115,31 +118,56 @@ pro RenderExampleMW, MODelfile=modelfile, EBTELfile=ebtelfile, LIBname=libname, 
  endelse
 
  forward_function LoadGXmodel, LoadEBTEL, MakeSimulationBox, DefineCoronaParams, ReserveOutputSpace
+ forward_function GXResolveObserverGeometry, GXComputeInscribingFOV, GXResolveSimboxFromObserverAndModel, $
+  GXObserverGeometry__saved_fov, GXObserverGeometry__saved_square_fov
  resolve_routine, 'LoadGXmodel', /either
  resolve_routine, 'LoadEBTEL', /either
  resolve_routine, 'MakeSimulationBox', /either
  resolve_routine, 'DefineCoronaParams', /either
  resolve_routine, 'ReserveOutputSpace', /either
  resolve_routine, 'ConvertToMaps', /either
+ resolve_routine, 'GXResolveObserverGeometry', /either
+ resolve_routine, 'GXComputeInscribingFOV', /either
+ resolve_routine, 'GXResolveSimboxFromObserverAndModel', /either
 
  tm=systime(1)
- model=LoadGXmodel(modelfile, DSun=dsun_kw, LONC=lonc_kw, B0SUN=b0sun_kw)
+ execute_text=''
+ box_struct=0
+ model=LoadGXmodel(modelfile, observer_struct=observer_struct, index_struct=index_struct, execute_text=execute_text, box_struct=box_struct)
  ebtel=LoadEBTEL(ebtelfile)
 
- ; Derive default center/FOV from model when not explicitly provided.
- dsun_km=double(model.DSun)/1d5
- km_to_arcsec=206265d0/dsun_km
- fov_x_model=double(model.Nx)*double(model.dx)/1d5*km_to_arcsec
- fov_y_model=double(model.Ny)*double(model.dy)/1d5*km_to_arcsec
+ geom=GXResolveObserverGeometry(model, index_struct=index_struct, observer_struct=observer_struct, $
+   DSun=dsun_kw, LONC=lonc_kw, B0SUN=b0sun_kw, observer_name=observer_name_kw, $
+   recompute_observer_ephemeris=recompute_observer_ephemeris)
+ model.DSun=double(geom.render_dsun_cm)
+ model.lonC=double(geom.render_lonc_deg)
+ model.b0Sun=double(geom.render_b0_deg)
 
- xc_auto=0d & yc_auto=0d
- catch, err
- if err eq 0 then begin
-  wcs_conv_hg_hpc, double(model.lonC), double(model.latC), xc_auto, yc_auto, $
-                  dsun_obs=double(model.DSun)/100, b0_angle=double(model.b0Sun), l0_angle=0d, /arcseconds
-  catch, /cancel
+ has_cli_observer_override=(n_elements(observer_name_kw) gt 0) or (n_elements(dsun_kw) gt 0) or $
+  (n_elements(lonc_kw) gt 0) or (n_elements(b0sun_kw) gt 0)
+ has_cli_view_override=(n_elements(xc) gt 0) or (n_elements(yc) gt 0) or (n_elements(xrange) gt 0) or $
+  (n_elements(yrange) gt 0) or (n_elements(nx) gt 0) or (n_elements(ny) gt 0)
+ saved_fov=0
+ square_fov=GXObserverGeometry__saved_square_fov(observer_struct)
+ prefer_saved_fov=(~has_cli_observer_override and ~has_cli_view_override)
+ if keyword_set(auto_fov) then prefer_saved_fov=0b
+ if n_elements(use_saved_fov) gt 0 then prefer_saved_fov=(long(use_saved_fov) ne 0L)
+ if prefer_saved_fov then saved_fov=GXObserverGeometry__saved_fov(observer_struct)
+ computed_fov=GXComputeInscribingFOV(model, geom, execute_text=execute_text, box_struct=box_struct, index_struct=index_struct, square_fov=square_fov)
+ simbox_default=GXResolveSimboxFromObserverAndModel(saved_fov=saved_fov, computed_fov=computed_fov)
+ if n_elements(simbox_default) gt 0 then begin
+  xc_auto=double(simbox_default.xc_arcsec)
+  yc_auto=double(simbox_default.yc_arcsec)
+  fov_x_model=double(simbox_default.xsize_arcsec)
+  fov_y_model=double(simbox_default.ysize_arcsec)
+  center_source=strtrim(string(simbox_default.source), 2)
  endif else begin
-  catch, /cancel
+  dsun_km=double(model.DSun)/1d5
+  km_to_arcsec=206265d0/dsun_km
+  fov_x_model=double(model.Nx)*double(model.dx)/1d5*km_to_arcsec
+  fov_y_model=double(model.Ny)*double(model.dy)/1d5*km_to_arcsec
+  xc_auto=0d & yc_auto=0d
+  center_source='fallback_zero'
  endelse
 
  if n_elements(xrange) gt 0 then begin
@@ -169,6 +197,10 @@ pro RenderExampleMW, MODelfile=modelfile, EBTELfile=ebtelfile, LIBname=libname, 
 
  fov_x=double(nx)*double(dx)
  fov_y=double(ny)*double(dy)
+ print, 'Observer geometry source: ', strtrim(string(geom.source), 2)
+ print, 'Observer triad: L0=', double(geom.l0_deg), ' B0=', double(geom.b0_deg), ' DSun=', double(geom.dsun_cm)
+ print, 'Render triad: lonC=', double(model.lonC), ' b0Sun=', double(model.b0Sun), ' DSun=', double(model.DSun)
+ print, 'Center source: ', center_source
  print, 'Window: xc=', xc, ' yc=', yc, ' dx=', dx, ' dy=', dy, ' Nx=', nx, ' Ny=', ny
  print, 'FOV: ', fov_x, ' x ', fov_y, ' arcsec'
 
@@ -181,7 +213,8 @@ pro RenderExampleMW, MODelfile=modelfile, EBTELfile=ebtelfile, LIBname=libname, 
  r=call_external(libname, 'ComputeMW', model, ebtel, simbox, coronaparms, outspace, SHtable)
  print, 'Elapsed time (main): ', systime(1)-tm, ' s'
 
- ConvertToMaps, outspace, simbox, model, mapI, mapV
+ ConvertToMaps, outspace, simbox, model, mapI, mapV, $
+  B0=double(geom.b0_deg), L0=double(geom.l0_deg), RSun=double(geom.rsun_arcsec)
  map=obj_new('map')
  for k=0L, n_elements(freqlist)-1L do map.setmap, k, mapI.getmap(k)
  for k=0L, n_elements(freqlist)-1L do map.setmap, n_elements(freqlist)+k, mapV.getmap(k)

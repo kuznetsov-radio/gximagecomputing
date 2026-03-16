@@ -7,9 +7,9 @@ __pycache__/
 *.ipynb
 
 # Local compiled extension artifacts from editable/dev builds
-src/pyGXrender/RenderGRFF*.so
-src/pyGXrender/RenderGRFF*.dylib
-src/pyGXrender/RenderGRFF*.dll
+src/gxrender/RenderGRFF*.so
+src/gxrender/RenderGRFF*.dylib
+src/gxrender/RenderGRFF*.dll
 
 # Local validation data (large; keep outside git history)
 test_data/
@@ -17,3 +17,6 @@ test_data/
 
 # Sphinx build output
 docs/_build/
+
+# Local developer-only helper scripts
+local/

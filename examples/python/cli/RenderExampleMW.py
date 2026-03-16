@@ -4,10 +4,10 @@
 
 This script remains in examples/ for user familiarity, but the implementation
 now lives in the installable package module:
-    pyGXrender.workflows.render_mw
+    gxrender.workflows.render_mw
 """
 
-from pyGXrender.workflows.render_mw import main
+from gxrender.workflows.render_mw import main
 
 
 if __name__ == "__main__":

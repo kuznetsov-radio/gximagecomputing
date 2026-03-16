@@ -2,9 +2,27 @@
 from __future__ import annotations
 
 import argparse
+import os
+import warnings
 from pathlib import Path
 
-from pyGXrender import MapGeometry, MWRenderOptions, ObserverOverrides, render_mw_maps
+from gxrender import (
+    CoronalPlasmaParameters,
+    MapGeometry,
+    MWRenderOptions,
+    ObserverOverrides,
+    render_mw_maps,
+)
+
+
+def _example_default_frequencies() -> list[float]:
+    import numpy as np
+
+    return np.arange(5.8, 12.0 + 1e-9, 0.2)[::2].astype(np.float64).tolist()
+
+
+def _warn_example_default(message: str) -> None:
+    warnings.warn(f"SDK MW example default applied: {message}", stacklevel=3)
 
 
 def parse_args() -> argparse.Namespace:
@@ -23,6 +41,15 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--nx", type=int, default=None)
     p.add_argument("--ny", type=int, default=None)
     p.add_argument("--pixel-scale-arcsec", type=float, default=None)
+    p.add_argument("--frequencies-ghz", nargs="+", type=float, default=None)
+    p.add_argument("--tbase", type=float, default=None)
+    p.add_argument("--nbase", type=float, default=None)
+    p.add_argument("--q0", type=float, default=None)
+    p.add_argument("--a", type=float, default=None)
+    p.add_argument("--b", type=float, default=None)
+    p.add_argument("--corona-mode", type=int, default=None)
+    p.add_argument("--shtable-path", type=Path, default=None)
+    p.add_argument("--selective-heating", action="store_true")
     p.add_argument("--dsun-cm", type=float, default=None)
     p.add_argument("--lonc-deg", type=float, default=None)
     p.add_argument("--b0sun-deg", type=float, default=None)
@@ -38,6 +65,42 @@ def parse_args() -> argparse.Namespace:
 
 def main() -> None:
     args = parse_args()
+    if args.ebtel_path is None:
+        env_ebtel = os.environ.get("GXIMAGECOMPUTING_EBTEL_PATH", "").strip()
+        if env_ebtel:
+            _warn_example_default(f"no explicit EBTEL path was provided, so GXIMAGECOMPUTING_EBTEL_PATH={env_ebtel!r} was assumed")
+            args.ebtel_path = env_ebtel
+        else:
+            _warn_example_default('no explicit EBTEL path was provided, so "" was used to disable DEM/DDM tables')
+            args.ebtel_path = ""
+    if args.pixel_scale_arcsec is None and args.dx is None and args.dy is None:
+        _warn_example_default("no explicit pixel scale was provided, so dx=dy=2.0 arcsec/pixel was assumed")
+        args.pixel_scale_arcsec = 2.0
+    if args.frequencies_ghz is None:
+        _warn_example_default("no explicit MW frequency list was provided, so 5.8..11.8 GHz was assumed")
+        args.frequencies_ghz = _example_default_frequencies()
+
+    plasma_defaults = {
+        "tbase": 1e6,
+        "nbase": 1e8,
+        "q0": 0.0217,
+        "a": 0.3,
+        "b": 2.7,
+    }
+    for key, value in plasma_defaults.items():
+        if getattr(args, key, None) is None:
+            _warn_example_default(f"no explicit {key} was provided, so {value!r} was assumed")
+            setattr(args, key, value)
+    if args.corona_mode is None:
+        _warn_example_default("no explicit corona mode was provided, so mode=0 was assumed")
+        args.corona_mode = 0
+
+    shtable = None
+    if args.shtable_path is not None:
+        import numpy as np
+
+        shtable = np.load(args.shtable_path)
+
     result = render_mw_maps(
         MWRenderOptions(
             model_path=args.model_path,
@@ -46,6 +109,17 @@ def main() -> None:
             output_dir=args.output_dir,
             output_name=args.output_name,
             output_format=args.output_format,
+            freqlist_ghz=args.frequencies_ghz,
+            plasma=CoronalPlasmaParameters(
+                tbase=args.tbase,
+                nbase=args.nbase,
+                q0=args.q0,
+                a=args.a,
+                b=args.b,
+                mode=args.corona_mode,
+                selective_heating=args.selective_heating,
+                shtable=shtable,
+            ),
             omp_threads=args.omp_threads,
             geometry=MapGeometry(
                 xc=args.xc,

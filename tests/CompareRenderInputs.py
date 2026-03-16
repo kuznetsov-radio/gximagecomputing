@@ -11,7 +11,8 @@ from typing import Dict
 
 import numpy as np
 
-from pyGXrender.radio import GXRadioImageComputing
+from gxrender.radio import GXRadioImageComputing
+from gxrender.utils.test_data import find_model_file
 
 
 FIELDS = [
@@ -60,12 +61,12 @@ def parse_args():
     p.add_argument(
         "--h5-path",
         type=Path,
-        default=Path(__file__).resolve().parents[1] / "test_data" / "test.chr.h5",
+        default=None,
     )
     p.add_argument(
         "--sav-path",
         type=Path,
-        default=Path(__file__).resolve().parents[1] / "test_data" / "test.chr.sav",
+        default=None,
     )
     p.add_argument(
         "--output-json",
@@ -78,6 +79,10 @@ def parse_args():
 
 def main():
     args = parse_args()
+    if args.h5_path is None:
+        args.h5_path = find_model_file("test.chr.h5")
+    if args.sav_path is None:
+        args.sav_path = find_model_file("test.chr.sav")
     if args.output_json is None:
         args.output_json = (
             Path(tempfile.gettempdir())

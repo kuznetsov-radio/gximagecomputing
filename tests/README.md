@@ -6,9 +6,43 @@ public user-facing quick-start documentation.
 
 ## Contents
 
+- External test-data installation
 - SAV↔H5 model parity checks
 - IDL/Python MW/EUV map parity comparisons
 - ComputeEUV pre-DLL input dump/compare workflows
+
+## External Test-Data Installation
+
+The large CHR model fixtures, EUV response bundles, and EBTEL tables are now distributed separately from this repository.
+
+Recommended layout:
+
+```text
+@SUNCAST-ORG/
+  gximagecomputing/
+  pyGXrender-test-data/
+```
+
+Clone the data repository next to `gximagecomputing` and install the default fixture set:
+
+```bash
+cd ..
+git clone https://github.com/suncast-org/pyGXrender-test-data.git
+cd pyGXrender-test-data
+scripts/install_dataset.sh
+```
+
+By default, the Python tests and shell example wrappers will look for extracted fixtures under:
+
+```text
+../pyGXrender-test-data/raw
+```
+
+You can override that discovery path with:
+
+```bash
+export GXRENDER_TEST_DATA_ROOT=/path/to/pyGXrender-test-data/raw
+```
 
 ## One-Command SAV↔H5 Parity Check
 
@@ -19,8 +53,7 @@ make parity-roundtrip
 ```
 
 Defaults:
-- `SAV_PATH=test_data/test.chr.sav`
-- `H5_PATH=test_data/test.chr.h5`
+- `SAV_PATH` and `H5_PATH` are auto-resolved from the external dataset when omitted
 - `ATOL=0`, `RTOL=0`
 
 Override example:
@@ -31,7 +64,7 @@ make parity-roundtrip \
   H5_PATH=/tmp/model.NAS.CHR.h5
 ```
 
-If your `test_data` is under Dropbox/iCloud and file locking interferes, prefer a temporary output file:
+If your fixture directory is under Dropbox/iCloud and file locking interferes, prefer a temporary output file:
 
 ```bash
 make parity-roundtrip H5_PATH=/tmp/test.chr.h5
@@ -64,7 +97,7 @@ IDL:
 RenderExampleEUV, $
   MODelfile='/path/to/model.chr.sav', $
   EBTELfile='/path/to/ebtel.sav', $
-  RESPonsefile='/path/to/aia_response.sav', $
+  RESPonsefile='/path/to/resp_aia_20251126T153431.sav', $
   DSUN=14763359700479.328d, $
   LONC=-17.0574058213d, $
   B0SUN=1.4406505929155138d, $
@@ -81,7 +114,7 @@ PYTHONPATH=src python examples/python/cli/RenderExampleEUV.py \
   --model-path /path/to/model.chr.sav \
   --model-format sav \
   --ebtel-path /path/to/ebtel.sav \
-  --response-sav /path/to/aia_response.sav \
+  --response-sav /path/to/resp_aia_20251126T153431.sav \
   --dsun-cm 14763359700479.328 \
   --lonc-deg -17.0574058213 \
   --b0sun-deg 1.4406505929155138 \
@@ -95,8 +128,8 @@ Compare EUV outputs (correct `CORONA/TR` labels):
 ```bash
 SUNPY_CONFIGDIR=/tmp/.sunpy-config MPLCONFIGDIR=/tmp/.mplconfig XDG_CACHE_HOME=/tmp/.cache \
 PYTHONPATH=src python tests/ComparePythonVsIDLEUVMaps.py \
-  --python-h5 /tmp/gximagecomputing_validation_groundtruth/test.chr.sav_py_euv_maps.h5 \
-  --idl-sav /tmp/gximagecomputing_validation_groundtruth/idl_euv_maps_forced.sav
+  --python-h5 /tmp/gximagecomputing_validation_groundtruth/test.chr.h5_py_euv_maps.h5 \
+  --idl-sav /tmp/gximagecomputing_validation_groundtruth/test.chr.sav_idl_euv_maps.sav
 ```
 
 ## Compare Scripts
