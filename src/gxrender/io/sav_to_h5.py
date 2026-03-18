@@ -16,6 +16,15 @@ from scipy.io import readsav
 from .voxel_id import gx_box2id
 
 
+def _derive_dsun_obs_from_rsun_arcsec(rsun_arcsec: float, rsun_ref_m: float = 696000000.0) -> float | None:
+    if not np.isfinite(rsun_arcsec) or rsun_arcsec <= 0:
+        return None
+    angle = np.deg2rad(rsun_arcsec / 3600.0)
+    if angle <= 0:
+        return None
+    return float(rsun_ref_m / np.tan(angle))
+
+
 def _decode_if_bytes(v: Any) -> Any:
     if isinstance(v, (bytes, np.bytes_)):
         return v.decode("utf-8", "ignore")
@@ -189,6 +198,7 @@ def _build_refmap_wcs_header(
     xunits: str,
     yunits: str,
     rsun_obs: float | None = None,
+    dsun_obs: float | None = None,
     b0: float | None = None,
     l0: float | None = None,
 ) -> str:
@@ -213,6 +223,10 @@ def _build_refmap_wcs_header(
         h["DATE-OBS"] = date_obs
     if rsun_obs is not None:
         h["RSUN_OBS"] = float(rsun_obs)
+    if dsun_obs is None and rsun_obs is not None:
+        dsun_obs = _derive_dsun_obs_from_rsun_arcsec(float(rsun_obs))
+    if dsun_obs is not None:
+        h["DSUN_OBS"] = float(dsun_obs)
     if b0 is not None:
         h["HGLT_OBS"] = float(b0)
     if l0 is not None:
@@ -275,6 +289,11 @@ def _extract_refmaps_from_box(box: Any) -> list[tuple[int, str, np.ndarray, str]
         xunits = _as_text(rec["XUNITS"]).strip() if "XUNITS" in names else "arcsec"
         yunits = _as_text(rec["YUNITS"]).strip() if "YUNITS" in names else "arcsec"
         rsun_obs = float(_as_scalar(rec["RSUN"])) if "RSUN" in names else None
+        dsun_obs = None
+        if "DSUN_OBS" in names:
+            dsun_obs = float(_as_scalar(rec["DSUN_OBS"]))
+        elif "DSUN" in names:
+            dsun_obs = float(_as_scalar(rec["DSUN"]))
         b0 = float(_as_scalar(rec["B0"])) if "B0" in names else None
         l0 = float(_as_scalar(rec["L0"])) if "L0" in names else None
 
@@ -288,6 +307,7 @@ def _extract_refmaps_from_box(box: Any) -> list[tuple[int, str, np.ndarray, str]
             xunits=xunits,
             yunits=yunits,
             rsun_obs=rsun_obs,
+            dsun_obs=dsun_obs,
             b0=b0,
             l0=l0,
         )

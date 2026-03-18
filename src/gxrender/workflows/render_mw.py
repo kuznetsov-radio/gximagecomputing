@@ -22,6 +22,25 @@ from gxrender.workflows._render_common import (
 )
 
 
+_PROJECTION_WARNING_EMITTED = False
+
+
+def _warn_projection_assumption_once() -> None:
+    global _PROJECTION_WARNING_EMITTED
+    if _PROJECTION_WARNING_EMITTED:
+        return
+    suppress = str(os.environ.get("GXRENDER_SUPPRESS_PROJECTION_WARNING", "")).strip().lower()
+    if suppress in {"1", "true", "yes", "on"}:
+        _PROJECTION_WARNING_EMITTED = True
+        return
+    warnings.warn(
+        "Current Python MW workflow uses projection=0 (parallel off, exact off) for the DLL simbox path. "
+        "This assumption is explicit in the workflow today because high-level projection controls are not exposed yet.",
+        stacklevel=2,
+    )
+    _PROJECTION_WARNING_EMITTED = True
+
+
 def _example_default_frequencies() -> list[float]:
     return np.arange(5.8, 12.0 + 1e-9, 0.2)[::2].astype(np.float64).tolist()
 
@@ -287,11 +306,7 @@ def run(args: argparse.Namespace, *, verbose: bool = True) -> dict:
 
     freqlist = resolve_mw_frequencies(args)
     plasma = resolve_plasma_parameters(args)
-    warnings.warn(
-        "Current Python MW workflow uses projection=0 (parallel off, exact off) for the DLL simbox path. "
-        "This assumption is explicit in the workflow today because high-level projection controls are not exposed yet.",
-        stacklevel=2,
-    )
+    _warn_projection_assumption_once()
 
     result = gxi.synth_model(
         model,
