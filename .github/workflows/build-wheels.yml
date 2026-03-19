@@ -1,0 +1,144 @@
+name: Build And Publish Wheels
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      publish_target:
+        description: "Optional manual publish target"
+        required: true
+        default: "none"
+        type: choice
+        options:
+          - none
+          - testpypi
+
+jobs:
+  build_wheels:
+    name: Build wheels on ${{ matrix.os }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-15-intel, macos-latest]
+        #os: [ubuntu-latest, windows-latest]
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: "recursive"
+      
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install cibuildwheel
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install cibuildwheel==2.19.1
+
+      - name: Pre-seed cibuildwheel cache
+        shell: bash
+        env:
+          CIBW_CACHE_PATH: ${{ runner.temp }}/cibw-cache
+        run: |
+          set -euo pipefail
+          mkdir -p "$CIBW_CACHE_PATH"
+          virtualenv_pyz="$CIBW_CACHE_PATH/virtualenv-20.26.2.pyz"
+
+          if [[ ! -s "$virtualenv_pyz" ]]; then
+            echo "Downloading virtualenv.pyz to $virtualenv_pyz"
+            curl -fL --retry 8 --retry-delay 5 --retry-all-errors \
+              https://bootstrap.pypa.io/virtualenv.pyz \
+              -o "$virtualenv_pyz"
+          fi
+
+          ls -lh "$virtualenv_pyz"
+
+      - name: Build wheels
+        shell: bash
+        env:
+          # Avoid 32-bit Windows wheels (win32) which are not supported by
+          # our dependency stack on CPython 3.12.
+          CIBW_ARCHS_WINDOWS: AMD64
+          # Avoid 32-bit Linux wheels (i686); we only support x86_64 in CI.
+          CIBW_ARCHS_LINUX: x86_64
+          # Reuse the pre-seeded cache path to avoid flaky remote fetches.
+          CIBW_CACHE_PATH: ${{ runner.temp }}/cibw-cache
+        run: |
+          set -euo pipefail
+          attempts=3
+          for attempt in $(seq 1 "$attempts"); do
+            echo "Starting cibuildwheel attempt $attempt/$attempts"
+            if python -m cibuildwheel . --output-dir wheelhouse; then
+              exit 0
+            fi
+
+            if [[ "$attempt" -lt "$attempts" ]]; then
+              sleep_time=$((attempt * 30))
+              echo "cibuildwheel failed on attempt $attempt. Retrying in ${sleep_time}s..."
+              sleep "$sleep_time"
+            fi
+          done
+
+          echo "cibuildwheel failed after $attempts attempts"
+          exit 1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: cibw-wheels-${{ matrix.os }}-${{ strategy.job-index }}
+          path: ./wheelhouse/*.whl
+  
+  make_sdist:
+    name: Make SDist
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        submodules: true  # Optional, use if you have submodules
+
+    - name: Build SDist
+      run: pipx run build --sdist
+
+    - uses: actions/upload-artifact@v4
+      with:
+        name: cibw-sdist
+        path: dist/*.tar.gz
+  
+  upload_all:
+    needs: [build_wheels, make_sdist]
+    environment: release
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags')
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: cibw-*
+        path: dist
+        merge-multiple: true
+    - uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        packages-dir: dist
+
+  upload_testpypi:
+    needs: [build_wheels, make_sdist]
+    environment: release-test
+    permissions:
+      id-token: write
+    runs-on: ubuntu-latest
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.publish_target == 'testpypi'
+    steps:
+    - uses: actions/download-artifact@v4
+      with:
+        pattern: cibw-*
+        path: dist
+        merge-multiple: true
+    - uses: pypa/gh-action-pypi-publish@release/v1
+      with:
+        repository-url: https://test.pypi.org/legacy/
+        packages-dir: dist
