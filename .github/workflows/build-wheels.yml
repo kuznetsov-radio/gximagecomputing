@@ -4,17 +4,16 @@ on:
   pull_request:
   push:
     branches: [main]
-    tags: ["v*"]
+    tags: ["*"]
   workflow_dispatch:
     inputs:
       publish_target:
         description: "Optional manual publish target"
         required: true
-        default: "none"
+        default: "pypi"
         type: choice
         options:
-          - none
-          - testpypi
+          - pypi
 
 jobs:
   build_wheels:
