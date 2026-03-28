@@ -1,7 +1,6 @@
-#include <Python.h>
+struct _object;
+using PyObject = _object;
 
-extern "C" {
-    PyObject* PyInit_RenderGRFF(void) {
-        return NULL;
-    }
+extern "C" PyObject* PyInit_RenderGRFF(void) {
+    return nullptr;
 }
