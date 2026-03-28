@@ -59,33 +59,51 @@ class GXRadioImageComputing:
 
         system = platform.system()
         candidates = []
+        package_local = []
+        package_local.extend(sorted(module_dir.glob("RenderGRFF*.so")))
+        package_local.extend(sorted(module_dir.glob("RenderGRFF*.dylib")))
+        package_local.extend(sorted(module_dir.glob("RenderGRFF*.dll")))
+        package_local.extend(sorted(module_dir.glob("RenderGRFF*.pyd")))
 
         if system == "Windows":
             candidates.extend([
                 module_dir / "RenderGRFF.pyd",
                 module_dir / "RenderGRFF_64.dll",
                 module_dir / "RenderGRFF_32.dll",
+            ])
+            candidates.extend(package_local)
+            candidates.extend([
                 binaries_dir / "RenderGRFF_64.dll",
                 binaries_dir / "RenderGRFF_32.dll",
             ])
         elif system == "Darwin":
             candidates.extend([
                 module_dir / f"RenderGRFF_{arch}.so",
-                binaries_dir / f"RenderGRFF_{arch}.so",
                 module_dir / "RenderGRFF.so",
+            ])
+            # Prefer package-local builds over shipped repo binaries so
+            # Python installs and in-place build_ext outputs win.
+            candidates.extend(package_local)
+            candidates.extend([
+                binaries_dir / f"RenderGRFF_{arch}.so",
                 binaries_dir / "RenderGRFF.so",
             ])
         else:
             candidates.extend([
                 module_dir / "RenderGRFF.so",
+            ])
+            candidates.extend(package_local)
+            candidates.extend([
                 binaries_dir / "RenderGRFF.so",
             ])
 
-        candidates.extend(sorted(module_dir.glob("RenderGRFF*.so")))
-        candidates.extend(sorted(module_dir.glob("RenderGRFF*.dylib")))
-        candidates.extend(sorted(module_dir.glob("RenderGRFF*.dll")))
-        candidates.extend(sorted(module_dir.glob("RenderGRFF*.pyd")))
-        return [candidate for candidate in candidates if candidate.exists()]
+        resolved = []
+        seen = set()
+        for candidate in candidates:
+            if candidate.exists() and candidate not in seen:
+                seen.add(candidate)
+                resolved.append(candidate)
+        return resolved
 
     def load_ebtel(self, ebtel_file):
         return io_load_ebtel(ebtel_file)
