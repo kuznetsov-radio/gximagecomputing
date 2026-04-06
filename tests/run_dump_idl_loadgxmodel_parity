@@ -1,7 +1,0 @@
-; IDL batch wrapper for loader-parity dumps.
-; Run from IDL command line with:
-;   @/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/tests/run_dump_idl_loadgxmodel_parity
-
-@/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/examples/idl/compile_local_idl
-.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/tests/DumpIDLLoadGXmodelParity.pro'
-DumpIDLLoadGXmodelParity

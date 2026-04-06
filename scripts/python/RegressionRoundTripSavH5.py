@@ -4,9 +4,9 @@
 Regression guard for SAV <-> H5 model parity.
 
 Usage examples:
-  python tests/RegressionRoundTripSavH5.py
-  python tests/RegressionRoundTripSavH5.py --rebuild-h5
-  python tests/RegressionRoundTripSavH5.py --sav-path /path/to/model.sav --h5-path /path/to/model.h5
+    python scripts/python/RegressionRoundTripSavH5.py
+    python scripts/python/RegressionRoundTripSavH5.py --rebuild-h5
+    python scripts/python/RegressionRoundTripSavH5.py --sav-path /path/to/model.sav --h5-path /path/to/model.h5
 """
 
 from __future__ import annotations

@@ -14,7 +14,7 @@ parity-roundtrip:
 		echo "Missing external fixture dataset. Clone ../pyGXrender-test-data next to gximagecomputing and run ../pyGXrender-test-data/scripts/install_dataset.sh, or set GXRENDER_TEST_DATA_ROOT to the extracted raw dataset directory."; \
 		exit 1; \
 	fi
-	HDF5_USE_FILE_LOCKING=FALSE PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src $(PYTHON) tests/RegressionRoundTripSavH5.py \
+	HDF5_USE_FILE_LOCKING=FALSE PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src $(PYTHON) scripts/python/RegressionRoundTripSavH5.py \
 		--sav-path "$(SAV_PATH)" \
 		--h5-path "$(H5_PATH)" \
 		--rebuild-h5 \

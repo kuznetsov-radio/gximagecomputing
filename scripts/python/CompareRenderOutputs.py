@@ -4,7 +4,7 @@ from __future__ import annotations
 
 # Runtime notes:
 # - If running from repository source (without pip install), use:
-#     PYTHONPATH=src python tests/CompareRenderOutputs.py ...
+#     PYTHONPATH=src python scripts/python/CompareRenderOutputs.py ...
 # - If SunPy/Matplotlib default config/cache folders are not writable, use:
 #     SUNPY_CONFIGDIR=/tmp/sunpy_cfg MPLCONFIGDIR=/tmp/mpl_cfg python ...
 
@@ -20,7 +20,7 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 
-REPO_ROOT = Path(__file__).resolve().parents[1]
+REPO_ROOT = Path(__file__).resolve().parents[2]
 RENDER_SCRIPT = REPO_ROOT / "examples" / "python" / "cli" / "RenderExampleMW.py"
 DEFAULT_TMP_DIR = Path(tempfile.gettempdir())
 
