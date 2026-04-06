@@ -70,6 +70,21 @@ If installed with pip, this is usually not needed:
 pip install .
 ```
 
+### Windows editable installs (`pip install -e .`)
+
+By default, local editable installs on Windows skip native extension compilation
+and use prebuilt runtime libraries (for example from `binaries/RenderGRFF_64.dll`).
+This avoids requiring Microsoft C++ Build Tools for routine development/testing.
+
+If you explicitly want to compile native code locally, set:
+
+```bash
+set PYGXRENDER_BUILD_NATIVE=1
+pip install -e .
+```
+
+Release wheel builds still force native compilation in CI.
+
 ### Writable Config/Cache Directories (SunPy/Matplotlib)
 
 Some environments have non-writable default user config/cache folders. In that case, use writable overrides:

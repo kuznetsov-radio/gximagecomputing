@@ -60,6 +60,7 @@ jobs:
       - name: Build wheels
         shell: bash
         env:
+          PYGXRENDER_BUILD_NATIVE: "1"
           # Avoid 32-bit Windows wheels (win32) which are not supported by
           # our dependency stack on CPython 3.12.
           CIBW_ARCHS_WINDOWS: AMD64
