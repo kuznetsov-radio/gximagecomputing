@@ -15,7 +15,7 @@ function dumpidlloadgxmodelparity__testdata_root
  endif
 
  exdir=file_dirname(routine_filepath('DumpIDLLoadGXmodelParity'))
- repodir=file_dirname(exdir)
+ repodir=file_dirname(file_dirname(exdir))
  return, file_expand_path(repodir+'/../pyGXrender-test-data/raw')
 end
 

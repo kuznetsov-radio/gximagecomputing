@@ -9,7 +9,7 @@ function dumpcomputeeuvinputs__testdata_root
   endif
 
   exdir=file_dirname(routine_filepath('DumpComputeEUVInputs'))
-  repodir=file_dirname(exdir)
+  repodir=file_dirname(file_dirname(exdir))
   return, file_expand_path(repodir+'/../pyGXrender-test-data/raw')
 end
 
@@ -28,7 +28,7 @@ pro DumpComputeEUVInputs, MODelfile=modelfile, EBTELfile=ebtelfile, RESPonsefile
   compile_opt idl2
 
   exdir=file_dirname(routine_filepath('DumpComputeEUVInputs'))
-  repodir=file_dirname(exdir)
+  repodir=file_dirname(file_dirname(exdir))
   local_idlcodedir=repodir+'/idlcode'
   env_ebtel=getenv('GXIMAGECOMPUTING_EBTEL_PATH')
   testdata_root=dumpcomputeeuvinputs__testdata_root()

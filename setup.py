@@ -23,6 +23,19 @@ link_flags = {
 current_os = platform.system()
 print("building for", current_os)
 
+
+def _env_flag(name: str, default: bool = False) -> bool:
+    value = os.environ.get(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+# Default policy:
+# - Windows: skip local native compilation unless explicitly requested.
+# - Linux/macOS: keep compiling by default.
+build_native = _env_flag("PYGXRENDER_BUILD_NATIVE", default=(current_os != "Windows"))
+
 if current_os in link_flags:
     extra_link = link_flags[current_os]
     extra_compile = compile_flags[current_os]
@@ -52,22 +65,28 @@ source_files = [str(source_dir / x.name) for x in sorted(source_dir.glob("*.cpp"
 if current_os != "Windows":
     source_files.remove(str(source_dir / "dllmain.cpp"))
 
-# pdb.set_trace()
-source_files.append("pyinit.cpp")
-
-# Define the extension module
-render_grff_module = Extension(
-    'gxrender.RenderGRFF',
-    sources=source_files,
-    extra_compile_args=extra_compile,
-    extra_link_args=extra_link,
-    include_dirs=[source_dir],
-    export_symbols=[],
-    language="c++",
-)
+ext_modules = []
+if build_native:
+    source_files.append("pyinit.cpp")
+    # Define the extension module
+    render_grff_module = Extension(
+        'gxrender.RenderGRFF',
+        sources=source_files,
+        extra_compile_args=extra_compile,
+        extra_link_args=extra_link,
+        include_dirs=[source_dir],
+        export_symbols=[],
+        language="c++",
+    )
+    ext_modules = [render_grff_module]
+else:
+    print(
+        "Skipping native extension build "
+        "(set PYGXRENDER_BUILD_NATIVE=1 to force local compilation)."
+    )
 
 setup(
     name="pyGXrender",
-    ext_modules=[render_grff_module],
+    ext_modules=ext_modules,
     include_package_data=True
 )

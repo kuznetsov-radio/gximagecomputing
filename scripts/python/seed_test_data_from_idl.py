@@ -17,7 +17,7 @@ def _default_idl_file() -> Path:
 
 
 def _default_test_data_dir() -> Path:
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
     return repo_root.parent / "pyGXrender-test-data" / "raw" / "manual_seed"
 
 
@@ -55,7 +55,7 @@ def _parse_args() -> argparse.Namespace:
 def main() -> None:
     args = _parse_args()
 
-    repo_root = Path(__file__).resolve().parents[1]
+    repo_root = Path(__file__).resolve().parents[2]
     build_h5_from_sav = _import_builder(repo_root)
 
     idl_file = args.idl_file.expanduser().resolve()

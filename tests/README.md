@@ -32,7 +32,7 @@ cd pyGXrender-test-data
 scripts/install_dataset.sh
 ```
 
-By default, the Python tests and shell example wrappers will look for extracted fixtures under:
+By default, the Python tests and workflow wrappers will look for extracted fixtures under:
 
 ```text
 ../pyGXrender-test-data/raw
@@ -69,6 +69,36 @@ If your fixture directory is under Dropbox/iCloud and file locking interferes, p
 ```bash
 make parity-roundtrip H5_PATH=/tmp/test.chr.h5
 ```
+
+## Workflow Wrappers By Platform
+
+Run these from repository root (`gximagecomputing/`) after activating your Python environment.
+
+Unix/macOS (or Git Bash):
+
+```bash
+bash scripts/unix/renderexampleeuv_test.sh
+bash scripts/unix/renderexamplemw_test.sh
+```
+
+Windows cmd/PowerShell:
+
+```bat
+scripts\win\renderexampleeuv_test.bat
+scripts\win\renderexamplemw_test.bat
+```
+
+Windows from Git Bash:
+
+```bash
+cmd //c scripts\\win\\renderexampleeuv_test.bat
+cmd //c scripts\\win\\renderexamplemw_test.bat
+```
+
+Default output location:
+
+- Unix/macOS wrappers: `/tmp/gximagecomputing_validation_groundtruth`
+- Windows wrappers: `%TEMP%\gximagecomputing_validation_groundtruth`
 
 ## IDL/Python EUV Parity Mode (Same Input = Same Output)
 
@@ -127,7 +157,7 @@ Compare EUV outputs (correct `CORONA/TR` labels):
 
 ```bash
 SUNPY_CONFIGDIR=/tmp/.sunpy-config MPLCONFIGDIR=/tmp/.mplconfig XDG_CACHE_HOME=/tmp/.cache \
-PYTHONPATH=src python tests/ComparePythonVsIDLEUVMaps.py \
+PYTHONPATH=src python scripts/python/ComparePythonVsIDLEUVMaps.py \
   --python-h5 /tmp/gximagecomputing_validation_groundtruth/test.chr.h5_py_euv_maps.h5 \
   --idl-sav /tmp/gximagecomputing_validation_groundtruth/test.chr.sav_idl_euv_maps.sav
 ```
@@ -135,17 +165,17 @@ PYTHONPATH=src python tests/ComparePythonVsIDLEUVMaps.py \
 ## Compare Scripts
 
 MW/EUV map comparisons:
-- `tests/ComparePythonVsIDLMaps.py` (shared implementation; supports `--kind auto|mw|euv`)
-- `tests/ComparePythonVsIDLEUVMaps.py` (EUV wrapper with `--kind euv` default)
+- `scripts/python/ComparePythonVsIDLMaps.py` (shared implementation; supports `--kind auto|mw|euv`)
+- `scripts/python/ComparePythonVsIDLEUVMaps.py` (EUV wrapper with `--kind euv` default)
 
 ComputeEUV pre-DLL input parity:
-- `tests/DumpComputeEUVInputs.py` (Python-side input dump)
-- `tests/dump_computeeuv_inputs.pro` (IDL-side input dump)
-- `tests/CompareComputeEUVInputs.py` (field-by-field Python vs IDL input comparison)
+- `scripts/python/DumpComputeEUVInputs.py` (Python-side input dump)
+- `scripts/idl/dump_computeeuv_inputs.pro` (IDL-side input dump)
+- `scripts/python/CompareComputeEUVInputs.py` (field-by-field Python vs IDL input comparison)
 
 Additional internal utilities:
-- `tests/CompareRenderInputs.py`
-- `tests/CompareRenderOutputs.py`
-- `tests/CompareModelSources.py`
-- `tests/RegressionRoundTripSavH5.py`
-- `tests/BuildH5FromSavGroundTruth.py`
+- `scripts/python/CompareRenderInputs.py`
+- `scripts/python/CompareRenderOutputs.py`
+- `scripts/python/CompareModelSources.py`
+- `scripts/python/RegressionRoundTripSavH5.py`
+- `scripts/python/BuildH5FromSavGroundTruth.py`
