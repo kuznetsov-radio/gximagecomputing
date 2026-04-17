@@ -61,7 +61,8 @@ echo Using Python: %PYTHON_CMD%
   --model-path "%MODEL%" ^
   --ebtel-path "%EBTEL%" ^
   --output-dir "%OUTDIR%" ^
-  --output-name "%OUTNAME%"
+  --output-name "%OUTNAME%" ^
+  --use-saved-fov
 if errorlevel 1 exit /b %errorlevel%
 
 echo You may use gxrender-map-view "%OUTDIR%\%OUTNAME%" to visualize the results

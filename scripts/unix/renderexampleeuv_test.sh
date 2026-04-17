@@ -100,10 +100,10 @@ ARGS=(
   --ebtel-path "$EBTEL"
   --output-dir "$OUTDIR"
   --output-name "$OUTNAME"
+  --use-saved-fov
 
   # Geometry / observer examples
   # --auto-fov
-  # --use-saved-fov
   # --observer stereo-a
   # --xc -903.0
   # --yc -171.0
