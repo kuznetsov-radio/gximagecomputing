@@ -1,4 +1,4 @@
-pro ConvertToMaps, out, box, model, mapI, mapV, flux=flux, B0=b0, L0=l0, RSun=rsun
+pro ConvertToMaps, out, box, model, mapI, mapV, flux=flux
  sfu=1d-19
  kB=1.380649d-16
  c=2.99792458d10
@@ -13,11 +13,13 @@ pro ConvertToMaps, out, box, model, mapI, mapV, flux=flux, B0=b0, L0=l0, RSun=rs
   r=flux_on ? sfu*c^2/(2.0*kB*(box.freqlist[k]*1d9)^2)/(box.dx*box.dy*(!dpi/180/60/60)^2) : 1d0
   m=make_map(out.TI[*, *, k]/r, xc=box.xc, yc=box.yc, dx=box.dx, dy=box.dy, $
              id=id+'I '+string(box.freqlist[k], format='(F5.2)')+' GHz', time=anytim(model.obstime, /vms), $
-             freq=box.freqlist[k], units=flux_on ? 'sfu pix^-1' : 'K', B0=b0, L0=l0, RSun=rsun)
+             freq=box.freqlist[k], units=flux_on ? 'sfu pix^-1' : 'K', $
+             roll_angle=box.rot)
   mapI->setmap, k, m
   m=make_map(out.TV[*, *, k]/r, xc=box.xc, yc=box.yc, dx=box.dx, dy=box.dy, $
              id=id+'V '+string(box.freqlist[k], format='(F5.2)')+' GHz', time=anytim(model.obstime, /vms), $
-             freq=box.freqlist[k], units=flux_on ? 'sfu pix^-1' : 'K', B0=b0, L0=l0, RSun=rsun)
+             freq=box.freqlist[k], units=flux_on ? 'sfu pix^-1' : 'K', $
+             roll_angle=box.rot)
   mapV->setmap, k, m
  endfor
 end
