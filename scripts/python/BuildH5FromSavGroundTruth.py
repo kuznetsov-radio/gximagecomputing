@@ -7,7 +7,7 @@ import tempfile
 from pathlib import Path
 
 from gxrender.io.sav_to_h5 import build_h5_from_sav
-from gxrender.utils.test_data import find_model_file
+from gxrender.utils.test_data import find_default_model_file
 
 
 def parse_args() -> argparse.Namespace:
@@ -36,7 +36,7 @@ def parse_args() -> argparse.Namespace:
 def main() -> None:
     args = parse_args()
     if args.sav_path is None:
-        args.sav_path = find_model_file("test.chr.sav")
+        args.sav_path = find_default_model_file(".sav")
     template_h5 = args.template_h5.expanduser().resolve() if args.template_h5 else None
     out_h5 = build_h5_from_sav(
         sav_path=args.sav_path,

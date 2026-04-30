@@ -34,8 +34,9 @@ pro DumpComputeEUVInputs, MODelfile=modelfile, EBTELfile=ebtelfile, RESPonsefile
   testdata_root=dumpcomputeeuvinputs__testdata_root()
 
   if n_elements(modelfile) eq 0 then begin
-    modelfile=dumpcomputeeuvinputs__find_fixture(testdata_root, 'models', 'test.chr.sav')
-    if strtrim(modelfile, 2) eq '' then message, 'Could not locate test.chr.sav under '+testdata_root
+    env_model=getenv('GXIMAGECOMPUTING_IDL_MODEL_PATH')
+    if strtrim(env_model, 2) ne '' then modelfile=env_model else modelfile=dumpcomputeeuvinputs__find_fixture(testdata_root, 'models', '*.sav')
+    if strtrim(modelfile, 2) eq '' then message, 'Could not locate an IDL SAV model fixture under '+testdata_root+'/models. The current pyGXrender-test-data default model bundle contains H5 models only; set GXIMAGECOMPUTING_IDL_MODEL_PATH to a SAV model for IDL dumps.'
   endif
   if n_elements(ebtelfile) eq 0 then begin
     if n_elements(env_ebtel) gt 0 then begin

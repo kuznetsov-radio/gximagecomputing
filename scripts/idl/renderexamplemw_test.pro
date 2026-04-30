@@ -23,8 +23,9 @@ end
 
 pro RenderExampleMW_test,_extra=_extra
   testdata_root=renderexamplemw_test__testdata_root()
-  modelfile=renderexamplemw_test__find_fixture(testdata_root, 'models', 'test.chr.sav')
-  if strtrim(modelfile, 2) eq '' then message, 'Could not locate test.chr.sav under '+testdata_root
+  modelfile=getenv('GXIMAGECOMPUTING_IDL_MODEL_PATH')
+  if strtrim(modelfile, 2) eq '' then modelfile=renderexamplemw_test__find_fixture(testdata_root, 'models', '*.sav')
+  if strtrim(modelfile, 2) eq '' then message, 'Could not locate an IDL SAV model fixture under '+testdata_root+'/models. The current pyGXrender-test-data default model bundle contains H5 models only; set GXIMAGECOMPUTING_IDL_MODEL_PATH to a SAV model for IDL examples.'
 
   ebtelfile=getenv('GXIMAGECOMPUTING_EBTEL_PATH')
   if strtrim(ebtelfile, 2) eq '' then ebtelfile=renderexamplemw_test__find_fixture(testdata_root, 'ebtel', 'ebtel.sav')
@@ -34,5 +35,5 @@ pro RenderExampleMW_test,_extra=_extra
     MODelfile=modelfile, $
     EBTELfile=ebtelfile, $
     OUTdir='/tmp/gximagecomputing_validation_groundtruth', $
-    OUTfile='test.chr.sav_idl_mw_maps.sav',_extra=_extra
+    OUTfile=file_basename(modelfile)+'_idl_mw_maps.sav',_extra=_extra
 end

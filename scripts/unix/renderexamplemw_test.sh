@@ -53,9 +53,7 @@ resolve_testdata() {
 }
 
 resolve_default_model() {
-  local testdata_root
-  testdata_root="$(resolve_testdata root)"
-  find "$testdata_root/models" -type f -name '*.h5' | sort | head -n 1
+  resolve_testdata default-model --suffix .h5
 }
 
 if [[ -n "$MODEL_NAME" ]]; then
@@ -131,8 +129,8 @@ ARGS=(
 cd "$REPO_ROOT"
 echo "Using Python: $PYTHON_CMD"
 env PYTHONPATH=src \
-    SUNPY_CONFIGDIR=/tmp/gximagecomputing_sunpy \
-    MPLCONFIGDIR=/tmp/gximagecomputing_mpl \
+    SUNPY_CONFIGDIR="$SUNPY_CONFIGDIR" \
+    MPLCONFIGDIR="$MPLCONFIGDIR" \
     "$PYTHON_CMD" src/gxrender/workflows/render_mw.py \
       "${ARGS[@]}"
 

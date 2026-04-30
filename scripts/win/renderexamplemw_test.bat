@@ -38,16 +38,14 @@ if not defined TESTDATA_ROOT (
 if defined MODEL_NAME (
   for /f "usebackq delims=" %%A in (`"%PYTHON_CMD%" -m gxrender.utils.test_data model "%MODEL_NAME%"`) do set "MODEL=%%A"
 ) else (
-  for /f "usebackq delims=" %%A in (`dir /b /s "%TESTDATA_ROOT%\models\*.h5" 2^>nul`) do (
-    if not defined MODEL set "MODEL=%%A"
-  )
+  for /f "usebackq delims=" %%A in (`"%PYTHON_CMD%" -m gxrender.utils.test_data default-model --suffix .h5`) do set "MODEL=%%A"
 )
 if not defined MODEL (
   echo Failed to resolve model test data.
   exit /b 1
 )
 
-for /f "usebackq delims=" %%I in ("%MODEL%") do set "MODEL_BASENAME=%%~nxI"
+for %%I in ("%MODEL%") do set "MODEL_BASENAME=%%~nxI"
 if not defined OUTNAME set "OUTNAME=%MODEL_BASENAME%_py_mw_maps.h5"
 
 for /f "usebackq delims=" %%A in (`"%PYTHON_CMD%" -m gxrender.utils.test_data ebtel "%EBTEL_NAME%"`) do set "EBTEL=%%A"

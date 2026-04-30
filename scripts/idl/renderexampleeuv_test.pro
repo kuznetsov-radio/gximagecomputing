@@ -23,8 +23,9 @@ end
 
 pro RenderExampleEUV_test,_extra=_extra
   testdata_root=renderexampleeuv_test__testdata_root()
-  modelfile=renderexampleeuv_test__find_fixture(testdata_root, 'models', 'test.chr.sav')
-  if strtrim(modelfile, 2) eq '' then message, 'Could not locate test.chr.sav under '+testdata_root
+  modelfile=getenv('GXIMAGECOMPUTING_IDL_MODEL_PATH')
+  if strtrim(modelfile, 2) eq '' then modelfile=renderexampleeuv_test__find_fixture(testdata_root, 'models', '*.sav')
+  if strtrim(modelfile, 2) eq '' then message, 'Could not locate an IDL SAV model fixture under '+testdata_root+'/models. The current pyGXrender-test-data default model bundle contains H5 models only; set GXIMAGECOMPUTING_IDL_MODEL_PATH to a SAV model for IDL examples.'
 
   ebtelfile=getenv('GXIMAGECOMPUTING_EBTEL_PATH')
   if strtrim(ebtelfile, 2) eq '' then ebtelfile=renderexampleeuv_test__find_fixture(testdata_root, 'ebtel', 'ebtel.sav')
@@ -35,5 +36,5 @@ pro RenderExampleEUV_test,_extra=_extra
     MODelfile=modelfile, $
     EBTELfile=ebtelfile, $
     INSTRument=instrument, $
-    OUTfile='/tmp/gximagecomputing_validation_groundtruth/test.chr.sav_idl_euv_maps.sav',_extra=_extra
+    OUTfile='/tmp/gximagecomputing_validation_groundtruth/'+file_basename(modelfile)+'_idl_euv_maps.sav',_extra=_extra
 end

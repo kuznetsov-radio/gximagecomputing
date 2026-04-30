@@ -17,7 +17,7 @@ if not os.environ.get("SUNPY_CONFIGDIR"):
     os.environ["SUNPY_CONFIGDIR"] = str(_sunpy_cfg)
 
 from gxrender.euv import GXEUVImageComputing, load_euv_response_sav
-from gxrender.utils.test_data import find_model_file, test_data_setup_hint, try_find_response_file
+from gxrender.utils.test_data import find_default_model_file, test_data_setup_hint, try_find_response_file
 from gxrender.workflows._render_common import DEFAULT_OUTDIR, prepare_common_inputs
 
 
@@ -161,7 +161,7 @@ def _save_array(out_dir: Path, name: str, arr: np.ndarray) -> None:
 def main() -> None:
     args = _parse_args()
     if args.model_path is None:
-        args.model_path = find_model_file("test.chr.sav")
+        args.model_path = find_default_model_file(".h5")
     if args.ebtel_path is None:
         args.ebtel_path = ""
     if args.pixel_scale_arcsec is None and args.dx is None and args.dy is None:

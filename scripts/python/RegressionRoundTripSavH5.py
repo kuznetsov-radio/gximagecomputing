@@ -28,7 +28,7 @@ os.environ.setdefault(
 
 from gxrender.io.sav_to_h5 import build_h5_from_sav
 from gxrender.radio import GXRadioImageComputing
-from gxrender.utils.test_data import find_model_file
+from gxrender.utils.test_data import find_default_model_file
 
 
 def _parse_args() -> argparse.Namespace:
@@ -111,9 +111,9 @@ def _compare_models(
 def main() -> int:
     args = _parse_args()
     if args.sav_path is None:
-        args.sav_path = find_model_file("test.chr.sav")
+        args.sav_path = find_default_model_file(".sav")
     if args.h5_path is None:
-        args.h5_path = find_model_file("test.chr.h5")
+        args.h5_path = find_default_model_file(".h5")
     sav_path = args.sav_path.expanduser().resolve()
     h5_path = args.h5_path.expanduser().resolve()
 

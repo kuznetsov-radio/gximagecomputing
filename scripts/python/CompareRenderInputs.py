@@ -12,7 +12,7 @@ from typing import Dict
 import numpy as np
 
 from gxrender.radio import GXRadioImageComputing
-from gxrender.utils.test_data import find_model_file
+from gxrender.utils.test_data import find_default_model_file
 
 
 FIELDS = [
@@ -80,9 +80,9 @@ def parse_args():
 def main():
     args = parse_args()
     if args.h5_path is None:
-        args.h5_path = find_model_file("test.chr.h5")
+        args.h5_path = find_default_model_file(".h5")
     if args.sav_path is None:
-        args.sav_path = find_model_file("test.chr.sav")
+        args.sav_path = find_default_model_file(".sav")
     if args.output_json is None:
         args.output_json = (
             Path(tempfile.gettempdir())
