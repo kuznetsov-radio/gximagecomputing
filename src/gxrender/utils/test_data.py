@@ -67,6 +67,11 @@ def _find_glob(patterns: list[str], *, subject: str) -> Path:
     raise FileNotFoundError(test_data_setup_hint(subject))
 
 
+def _model_file_sort_key(path: Path) -> tuple[int, int, str]:
+    is_default_model_bundle = any(part.startswith("models_") for part in path.parts)
+    return (0 if is_default_model_bundle else 1, len(path.parts), str(path))
+
+
 def find_model_files(suffix: str | None = None) -> list[Path]:
     suffix_norm = suffix.lower() if suffix else None
     matches: list[Path] = []
@@ -74,7 +79,7 @@ def find_model_files(suffix: str | None = None) -> list[Path]:
     for root in existing_test_data_roots():
         models_root = root / "models"
         search_root = models_root if models_root.exists() else root
-        root_matches = sorted(search_root.rglob("*"), key=lambda p: (len(p.parts), str(p)))
+        root_matches = sorted(search_root.rglob("*"), key=_model_file_sort_key)
         for path in root_matches:
             if not path.is_file():
                 continue
@@ -86,6 +91,21 @@ def find_model_files(suffix: str | None = None) -> list[Path]:
         if matches:
             break
     return matches
+
+
+def find_model_loader_parity_files() -> tuple[Path, Path]:
+    for sav_path in find_model_files(".sav"):
+        clone_h5_path = sav_path.with_suffix(".clone.h5")
+        if clone_h5_path.is_file():
+            return sav_path, clone_h5_path
+    raise FileNotFoundError(test_data_setup_hint("loader parity fixtures"))
+
+
+def try_find_model_loader_parity_files() -> tuple[Path, Path] | None:
+    try:
+        return find_model_loader_parity_files()
+    except FileNotFoundError:
+        return None
 
 
 def find_default_model_file(suffix: str | None = None) -> Path:
