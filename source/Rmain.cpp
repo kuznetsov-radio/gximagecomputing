@@ -7,6 +7,8 @@
 #include "RenderIrregular.h"
 #include "MWtransfer.h"
 #include "GXdefs.h"
+#include "DEM.h"
+#include "Messages.h"
 
 #ifdef WINDOWS
 #include <ppl.h>
@@ -15,9 +17,6 @@
 #include <omp.h>
 #define __int32 int32_t
 #endif
-
-#define InSize 15
-#define OutSize 7
 
 #ifdef WINDOWS
 extern "C" __declspec(dllexport) int ComputeMW_fragment(int argc, void **argv)
@@ -131,6 +130,9 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  int interpolB=(cp_mode & 2)!=0;
  int aNT=(cp_mode & 4)!=0;
 
+ int exportData=(cp_mode & 1024)!=0;
+ int exportLOSs=(cp_mode & 2048)!=0;
+
  //-------------------------------------
 
  __int32 *o_flagsAll=(__int32*)argv[4];
@@ -138,6 +140,13 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 
  double *o_TI=(double*)(o_flagsCorona+6);
  double *o_TV=o_TI+b_Nx*b_Ny*b_Nf;
+
+ int rrr=((b_Nx*b_Ny % 2)==0) ? 2 : 1;
+ int Xd_NvoxMax=*((__int32*)argv[4]);
+ __int32 *Xd_Nvoxels=((__int32*)argv[4])+2;
+ __int32 *Xd_Lparms=Xd_Nvoxels+b_Nx*b_Ny+rrr;
+ double *Xd_Rparms=(double*)(Xd_Lparms+LpSize*b_Nx*b_Ny+rrr);
+ double *Xd_Parms=Xd_Rparms+RpSize*b_Nx*b_Ny;
 
  //-------------------------------------
 
@@ -211,8 +220,8 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  rb[1]=-m_dy*(m_Ny-1)/2;
  rb[2]=m_RSun;
 
- double *LgridL, *QgridL, *Tgrid;
- LgridL=QgridL=Tgrid=0;
+ double *LgridL, *QgridL, *Tgrid, *lnTgrid;
+ LgridL=QgridL=Tgrid=lnTgrid=0;
 
  if (DEM_on || DDM_on)
  {
@@ -224,6 +233,9 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
 
   Tgrid=(double*)malloc(e_NT*sizeof(double));
   for (int i=0; i<e_NT; i++) Tgrid[i]=pow(10.0, (double)e_logtdem[i]);
+
+  lnTgrid=(double*)malloc(e_NT*sizeof(double));
+  for (int i=0; i<e_NT; i++) lnTgrid[i]=(double)e_logtdem[i]*log(10.0);
  }
 
  double H_corona=corona_Hscale*cp_Tbase;
@@ -254,7 +266,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  Lparms[2]=(DEM_on || DDM_on) ? e_NT : 0;
 
  double Rparms[3]={0, 0, 0};
- Rparms[0]=b_dx*b_dy;
+ Rparms[0]=b_dx*b_dy*sqr(AU*M_PI/3600/180);
 
  int NvoxMax=300;
  double *Parms=(double*)malloc(InSize*NvoxMax*sizeof(double));
@@ -357,7 +369,9 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
    }
   }
 
-  if (Nvoxels>0)
+  if (exportData) Xd_Nvoxels[D2(b_Nx, i, j)]=Nvoxels;
+
+  if ((!exportData) || (exportData && exportLOSs)) if (Nvoxels>0)
   {
    Lparms[0]=Nvoxels;
 
@@ -514,46 +528,71 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
                                   Bx*norm_x[0]+By*norm_x[1]+Bz*norm_x[2])/M_PI*180 : 0; //azimuthal angle
    }
 
-   memset(RL, 0, OutSize*b_Nf*sizeof(double));
-   for (int l=0; l<b_Nf; l++) RL[D2(OutSize, 0, l)]=b_freqlist[l];
-
-   ARGV[0]=(void*)Lparms;
-   ARGV[1]=(void*)Rparms;
-   ARGV[2]=(void*)Parms;
-   ARGV[3]=(DEM_on || DDM_on) ? (void*)Tgrid : 0;
-   ARGV[4]=(DEM_on) ? (void*)DEM_arr : 0;
-   ARGV[5]=(DDM_on) ? (void*)DDM_arr : 0;
-   ARGV[6]=(void*)RL;
-
-   res=GET_MW(7, ARGV);
-
-   for (int l=0; l<b_Nf; l++)
+   if (!exportData)
    {
-	I_L[D3(b_Nx, b_Ny, i, j, l)]=RL[D2(OutSize, 5, l)];
-	I_R[D3(b_Nx, b_Ny, i, j, l)]=RL[D2(OutSize, 6, l)];
+    memset(RL, 0, OutSize*b_Nf*sizeof(double));
+    for (int l=0; l<b_Nf; l++) RL[D2(OutSize, 0, l)]=b_freqlist[l];
+
+    ARGV[0]=(void*)Lparms;
+    ARGV[1]=(void*)Rparms;
+    ARGV[2]=(void*)Parms;
+    ARGV[3]=(DEM_on || DDM_on) ? (void*)Tgrid : 0;
+    ARGV[4]=(DEM_on) ? (void*)DEM_arr : 0;
+    ARGV[5]=(DDM_on) ? (void*)DDM_arr : 0;
+    ARGV[6]=(void*)RL;
+
+    res=GET_MW(7, ARGV);
+
+    for (int l=0; l<b_Nf; l++)
+    {
+ 	 I_L[D3(b_Nx, b_Ny, i, j, l)]=RL[D2(OutSize, 5, l)];
+	 I_R[D3(b_Nx, b_Ny, i, j, l)]=RL[D2(OutSize, 6, l)];
+    }
+   }
+   else if (exportLOSs)
+   {
+	for (int k=0; k<Nvoxels; k++) if ((Parms[D2(InSize, 12, k)]==0) || (Parms[D2(InSize, 11, k)]==0))
+	{
+	 double n0iso, T0iso;
+	 if (Parms[D2(InSize, 12, k)]==0) DDM_moments(Tgrid, lnTgrid, DDM_arr+e_NT*k, e_NT, &n0iso, &T0iso);
+     else DEM_moments(Tgrid, lnTgrid, DEM_arr+e_NT*k, e_NT, &n0iso, &T0iso);
+	 Parms[D2(InSize, 1, k)]=T0iso;
+	 Parms[D2(InSize, 2, k)]=n0iso;
+	 Parms[D2(InSize, 11, k)]=Parms[D2(InSize, 12, k)]=1;
+	}
+
+	for (int l=0; l<LpSize; l++) Xd_Lparms[D3(LpSize, b_Nx, l, i, j)]=Lparms[l];
+
+	for (int l=0; l<RpSize; l++) Xd_Rparms[D3(RpSize, b_Nx, l, i, j)]=Rparms[l];
+
+	for (int l=0; l<InSize; l++) for (int k=0; k<Nvoxels; k++)
+	 Xd_Parms[D4(InSize, Xd_NvoxMax, b_Nx, l, k, i, j)]=Parms[D2(InSize, l, k)];
    }
   }
  }
 
- for (int k=0; k<b_Nf; k++)
+ if (!exportData) 
  {
-  double r=sfu*c*c/(2.0*kB*sqr(b_freqlist[k]*1e9))/Rparms[0]*AU*AU;
-
-  for (int i=i_start; i<=i_end; i++) for (int j=j_start; j<=j_end; j++)
+  for (int k=0; k<b_Nf; k++)
   {
-   o_TI[D3(b_Nx, b_Ny, i, j, k)]=(I_R[D3(b_Nx, b_Ny, i, j, k)]+I_L[D3(b_Nx, b_Ny, i, j, k)])*r;
-   o_TV[D3(b_Nx, b_Ny, i, j, k)]=(I_R[D3(b_Nx, b_Ny, i, j, k)]-I_L[D3(b_Nx, b_Ny, i, j, k)])*r;
-  }
- }
+   double r=sfu*c*c/(2.0*kB*sqr(b_freqlist[k]*1e9))/Rparms[0]*AU*AU;
 
- #ifdef WINDOWS
- if (cs) cs->lock();
- for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) flagsGlobal[i]|=flags[i];
- if (cs) cs->unlock();
- #else
- #pragma omp critical (UpdateFlags)
- for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) flagsGlobal[i]|=flags[i];
- #endif
+   for (int i=i_start; i<=i_end; i++) for (int j=j_start; j<=j_end; j++)
+   {
+    o_TI[D3(b_Nx, b_Ny, i, j, k)]=(I_R[D3(b_Nx, b_Ny, i, j, k)]+I_L[D3(b_Nx, b_Ny, i, j, k)])*r;
+    o_TV[D3(b_Nx, b_Ny, i, j, k)]=(I_R[D3(b_Nx, b_Ny, i, j, k)]-I_L[D3(b_Nx, b_Ny, i, j, k)])*r;
+   }
+  }
+
+  #ifdef WINDOWS
+  if (cs) cs->lock();
+  for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) flagsGlobal[i]|=flags[i];
+  if (cs) cs->unlock();
+  #else
+  #pragma omp critical (UpdateFlags)
+  for (int i=0; i<m_Nx*m_Ny*m_Nz; i++) flagsGlobal[i]|=flags[i];
+  #endif
+ }
 
  free(RL);
  if (DDM_arr) free(DDM_arr);
@@ -565,6 +604,7 @@ extern "C" double ComputeMW_fragment(int argc, void **argv)
  free(ds);
  free(VoxList);
  free(flags);
+ if (lnTgrid) free(lnTgrid);
  if (Tgrid) free(Tgrid);
  if (QgridL) free(QgridL);
  if (LgridL) free(LgridL);
@@ -601,6 +641,10 @@ extern "C" int ComputeMW(int argc, void **argv)
  b32++;
  int projection=*(b32++);
  int Nthreads=projection>>16;
+
+ __int32 *cp32=(__int32*)argv[3];
+ int cp_mode=*(cp32+10);
+ int exportData=(cp_mode & 1024)!=0;
                      
  __int32 *o_flagsAll=(__int32*)argv[4];
  __int32 *o_flagsCorona=o_flagsAll+6;
@@ -681,7 +725,7 @@ extern "C" int ComputeMW(int argc, void **argv)
  }
  #endif
 
- for (int i=0; i<m_Nx; i++) for (int j=0; j<m_Ny; j++) for (int k=0; k<m_Nz; k++) for (int m=0; m<6; m++)
+ if (!exportData) for (int i=0; i<m_Nx; i++) for (int j=0; j<m_Ny; j++) for (int k=0; k<m_Nz; k++) for (int m=0; m<6; m++)
  {
   if ((flags[D3(m_Nx, m_Ny, i, j, k)] & (char(1)<<m))!=0)
   {

@@ -8,10 +8,7 @@
 #include "FF.h"
 #include "Neutrals.h"
 #include "GR.h"
-
-#define InSize 15
-#define OutSize 7
-#define RpSize 3
+#include "MWtransfer.h"
 
 typedef struct
 {
@@ -24,14 +21,14 @@ typedef struct
  double dz;
  double f_p;
  int DEM_on, DDM_on, FF_on, GR_on, HHe_on, force_isothermal, s_max, j_ofs, ABcode, dfcode;
- double kn;
+ double S, kappa_n;
 } Voxel;
 
 void ProcessVoxels(int Nz0, double *Parms, int NT, double *T_arr, double *lnT_arr, double *DEM_arr, double *DDM_arr, Voxel *V)
 {
  for (int j=0; j<Nz0; j++)
  {
-  double *p=Parms+j*InSize;
+  double *p=Parms+j*InSize_int;
 
   V[j].dz=max(p[0], 0.0);
   V[j].T0=max(p[1], 0.0);
@@ -59,7 +56,9 @@ void ProcessVoxels(int Nz0, double *Parms, int NT, double *T_arr, double *lnT_ar
   V[j].dfcode=(int)p[13];
   if (V[j].dfcode<0 || V[j].dfcode>2) V[j].dfcode=0;
 
-  V[j].kn=p[14]; //probably, has to be checked for correct values
+  V[j].S=p[14];
+
+  V[j].kappa_n=p[15];
 
   V[j].j_ofs=j;
 
@@ -489,15 +488,13 @@ extern "C" int GET_MW(int argc, void **argv)
  {
   int *Lparms1=(int*)argv[0];
   double *Rparms=(double*)argv[1];
-  double *Parms1=(double*)argv[2];
+  double *Parms_ext=(double*)argv[2];
   double *T_arr=(double*)argv[3];
   double *DEM_arr=(double*)argv[4];
   double *DDM_arr=(double*)argv[5];
   
-  #define InSize1 15
-
   int Nz=Lparms1[0];
-  double *Parms=(double*)malloc(sizeof(double)*InSize*Nz);
+  double *Parms_int=(double*)malloc(sizeof(double)*InSize_int*Nz);
 
   int NT=Lparms1[2];
 
@@ -510,8 +507,8 @@ extern "C" int GET_MW(int argc, void **argv)
 
   for (int j=0; j<Nz; j++)
   {
-   double *p=Parms+j*InSize;
-   double *p1=Parms1+j*InSize1;
+   double *p=Parms_int+j*InSize_int;
+   double *p1=Parms_ext+j*InSize;
 
    for (int i=0; i<=7; i++) p[i]=p1[i]; //parameters 0-7 are the same in both functions
    p[8]=p1[9]; //n_H
@@ -519,7 +516,9 @@ extern "C" int GET_MW(int argc, void **argv)
    p[10]=DEM_on_global ? p1[11] : 1; //DEM key
    p[11]=DDM_on_global ? p1[12] : 1; //DDM key
    p[12]=p1[13]; //abundance key
-   p[13]=p[14]=0; //Maxwellian distribution only
+   p[13]=p1[15]; //thermal distribution type
+   p[14]=p1[14]; //source area (if nonzero)
+   p[15]=p1[16]; //kappa or n
 
    int DEM_on=(p[10]==0 && NT>1);
    int DDM_on=(p[11]==0 && NT>1);
@@ -553,7 +552,7 @@ extern "C" int GET_MW(int argc, void **argv)
   {
    double *RL=(double*)argv[6];
 
-   res=MW_Transfer(Lparms, Rparms, Parms, T_arr, DEM_arr, DDM_arr, RL, 0, 0, 0, 0);
+   res=MW_Transfer(Lparms, Rparms, Parms_int, T_arr, DEM_arr, DDM_arr, RL, 0, 0, 0, 0);
   }
   else
   {
@@ -562,10 +561,10 @@ extern "C" int GET_MW(int argc, void **argv)
    double *Z_arr=(double*)argv[8];
    double *RL=(double*)argv[9];
 
-   res=MW_Transfer(Lparms, Rparms, Parms, T_arr, DEM_arr, DDM_arr, RL, 1, fZ_arr, TZ_arr, Z_arr);
+   res=MW_Transfer(Lparms, Rparms, Parms_int, T_arr, DEM_arr, DDM_arr, RL, 1, fZ_arr, TZ_arr, Z_arr);
   }
 
-  free(Parms);
+  free(Parms_int);
 
  }
  else res=-1;
