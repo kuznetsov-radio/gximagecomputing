@@ -1,33 +1,6 @@
-;+
-; NAME:
-;   LoadGXmodel
-;
-; PURPOSE:
-;   Load a GX model file (.sav or .h5) into the DLL-ready model structure used
-;   by the microwave and EUV rendering interface.
-;
-; NOTES:
-;   - Explicit DSun/LONC/B0SUN overrides take precedence.
-;   - File-first loading uses saved observer metadata when available.
-;   - `observer_struct=...` returns the saved observer metadata alongside the
-;     DLL-ready model without rereading the input file.
-;   - `index_struct=...` returns the preserved saved index/header structure
-;     alongside the DLL-ready model without rereading the input file.
-;-
-function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime, DSUN=dsun_kw, LONC=lonc_kw, B0SUN=b0sun_kw, $
-                     recompute_observer_ephemeris=recompute_observer_ephemeris, observer_name=observer_name_kw, $
-                     observer_struct=observer_out, index_struct=index_out, execute_text=execute_out, box_struct=box_out
+function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime
+ forward_function LoadGXmodel__load_box
  box=LoadGXmodel__load_box(infile)
- if arg_present(box_out) then box_out=box
- if arg_present(observer_out) then begin
-  if tag_exist(box, 'OBSERVER') then observer_out=box.observer else observer_out=0
- endif
- if arg_present(index_out) then begin
-  if tag_exist(box, 'INDEX') then index_out=box.index else index_out=0
- endif
- if arg_present(execute_out) then begin
-  if tag_exist(box, 'EXECUTE') then execute_out=box.execute else execute_out=''
- endif
 
  obstime=0d
  if tag_exist(box, 'INDEX') and tag_exist(box.index, 'DATE_OBS') then obstime=anytim(box.index.date_obs)
@@ -35,8 +8,6 @@ function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime, DSUN=dsun_kw
  lonC=0d
  latC=0d
  RSun=6.96d10
- saved_observer_name='earth'
- lon_ref=!values.d_nan
 
  if tag_exist(box, 'INDEX') then begin
   ; Prefer robust WCS conversion when full header is available.
@@ -51,18 +22,10 @@ function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime, DSUN=dsun_kw
    catch, /cancel
   endelse
 
-  if tag_exist(box, 'OBSERVER') then begin
-   if tag_exist(box.observer, 'NAME') then begin
-    obsname_tmp=strtrim(string(box.observer.name), 2)
-    if obsname_tmp ne '' then saved_observer_name=strlowcase(obsname_tmp)
-   endif
-  endif else if tag_exist(box.index, 'OBSERVER') then saved_observer_name=strlowcase(strtrim(string(box.index.observer), 2)) $
-  else if tag_exist(box.index, 'OBSERVATORY') then saved_observer_name=strlowcase(strtrim(string(box.index.observatory), 2))
-
   ; Fallback to direct heliographic tags when WCS parsing is unavailable.
-  if (lonC eq 0d) and tag_exist(box.index, 'CRVAL1') then lonC=double(box.index.crval1)
-  if tag_exist(box.index, 'CRVAL2') then latC=double(box.index.crval2)
-  if tag_exist(box.index, 'CRVAL1') then lon_ref=double(box.index.crval1)
+;  if tag_exist(box.index, 'HGLN_OBS') then lonC=double(box.index.hgln_obs) $
+;  else if tag_exist(box.index, 'CRVAL1') then lonC=double(box.index.crval1)
+;  if tag_exist(box.index, 'CRVAL2') then latC=double(box.index.crval2)
  endif
 
  if exist(newTime) then begin
@@ -72,60 +35,14 @@ function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime, DSUN=dsun_kw
   obstime=obstime1
  endif
 
- recompute_obs=keyword_set(recompute_observer_ephemeris)
- if ~recompute_obs then begin
-  DSun=!values.d_nan
-  b0Sun=!values.d_nan
-  has_observer=0b
-  has_observer_pb0r=0b
-  has_observer_ephemeris=0b
-  if tag_exist(box, 'OBSERVER') then begin
-   has_observer=1b
-   if tag_exist(box.observer, 'EPHEMERIS') then begin
-    has_observer_ephemeris=1b
-    if tag_exist(box.observer.ephemeris, 'DSUN_CM') then DSun=double(box.observer.ephemeris.dsun_cm)
-   endif
-   if tag_exist(box.observer, 'PB0R') then begin
-    has_observer_pb0r=1b
-    if tag_exist(box.observer.pb0r, 'B0_DEG') then b0Sun=double(box.observer.pb0r.b0_deg)
-   endif
-  endif
-  if ~finite(DSun) and tag_exist(box, 'INDEX') and tag_exist(box.index, 'DSUN_OBS') then DSun=double(box.index.dsun_obs)
-  if ~finite(b0Sun) and tag_exist(box, 'INDEX') and tag_exist(box.index, 'SOLAR_B0') then b0Sun=double(box.index.solar_b0)
-  if finite(lon_ref) and tag_exist(box, 'INDEX') and tag_exist(box.index, 'CRLN_OBS') then lonC=lon_ref-double(box.index.crln_obs)
-  ; pyAMPP HDF5 index stores DSUN_OBS in meters; RenderGRFF expects centimeters.
-  ; Keep backward compatibility with legacy SAV values already in centimeters.
-  if finite(DSun) and (DSun lt 1d12) then DSun=DSun*100d
-  if ~finite(DSun) or ~finite(b0Sun) then recompute_obs=1b
- endif
-
- if recompute_obs then begin
-  observer_name='earth'
- if n_elements(observer_name_kw) gt 0 then observer_name=strlowcase(strtrim(string(observer_name_kw), 2)) $
- else if n_elements(saved_observer_name) gt 0 then observer_name=saved_observer_name
-  obstext=strtrim(anytim(obsTime, /ccsds), 2)
-
-  case observer_name of
-   'earth': angles=pb0r(obstext, /earth, l0=l0)
-   'sdo': angles=pb0r(obstext, /earth, l0=l0)
-   'stereo-a': angles=pb0r(obstext, stereo='A', l0=l0)
-   'stereo b': angles=pb0r(obstext, stereo='B', l0=l0)
-   'stereo-b': angles=pb0r(obstext, stereo='B', l0=l0)
-   'solar orbiter': angles=pb0r(obstext, /solo, l0=l0)
-   'solo': angles=pb0r(obstext, /solo, l0=l0)
-   else: message, 'Cannot recompute observer ephemeris for observer: '+observer_name
-  endcase
-
-  b0Sun=double(angles[1])
-  DSun=RSun/tan((double(angles[2])/60d)*!dtor)
-  carr_earth=(tim2carr(obstext))[0]
-  observer_crln=carr_earth+double(l0)
-  if finite(lon_ref) then lonC=lon_ref-observer_crln else lonC=-observer_crln
- endif
-
- if n_elements(dsun_kw) gt 0 then DSun=double(dsun_kw)
- if n_elements(lonc_kw) gt 0 then lonC=double(lonc_kw)
- if n_elements(b0sun_kw) gt 0 then b0Sun=double(b0sun_kw)
+ a=get_sun(anytim(obsTime, /ex))
+ DSun=a[0]*1.495978707d13
+ b0Sun=a[11]
+; if tag_exist(box, 'INDEX') and tag_exist(box.index, 'DSUN_OBS') then DSun=double(box.index.dsun_obs)
+; if tag_exist(box, 'INDEX') and tag_exist(box.index, 'SOLAR_B0') then b0Sun=double(box.index.solar_b0)
+ ; pyAMPP HDF5 index stores DSUN_OBS in meters; RenderGRFF expects centimeters.
+ ; Keep backward compatibility with legacy SAV values already in centimeters.
+ if DSun lt 1d12 then DSun=DSun*100d
 
  dx=box.dr[0]*RSun
  dy=box.dr[1]*RSun

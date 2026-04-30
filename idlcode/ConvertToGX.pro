@@ -1,17 +1,3 @@
-;+
-; NAME:
-;   ConvertToGX
-;
-; PURPOSE:
-;   Convert a gximagecomputing/pyAMPP HDF5 model into the GX-style `box`
-;   structure consumed by `LoadGXmodel`.
-;
-; NOTES:
-;   - Preserves `box.index` as the saved birth-certificate header.
-;   - Mirrors the full `/observer` HDF5 subtree dynamically into
-;     `box.observer`.
-;   - Does not rewrite `box.index` from observer metadata.
-;-
 function ConvertToGX__read_dataset, file_id, dataset_path, required=required, ok=ok
  ok=0b
  catch, err
@@ -62,100 +48,6 @@ function ConvertToGX__read_attr, obj_id, attr_name, ok=ok
  h5a_close, aid
  ok=1b
  return, v
-end
-
-function ConvertToGX__sanitize_tag_name, name
- s=strupcase(strtrim(string(name), 2))
- if s eq '' then return, 'EMPTY'
- s=strcompress(s, /remove_all)
- for i=0L, strlen(s)-1L do begin
-  ch=strmid(s, i, 1)
-  if ((ch ge 'A') and (ch le 'Z')) or ((ch ge '0') and (ch le '9')) or (ch eq '_') then continue
-  s=strmid(s, 0, i)+'_'+strmid(s, i+1)
- endfor
- first=strmid(s, 0, 1)
- if ~(((first ge 'A') and (first le 'Z')) or (first eq '_')) then s='_'+s
- return, s
-end
-
-function ConvertToGX__list_group_names, file_id, group_path, infile=infile
- names=''
- nfound=0L
- catch, err
- if err ne 0 then begin
-  catch, /cancel
-  names=''
- endif
-
- catch, err1
- if err1 eq 0 then begin
-  grp_id=h5g_open(file_id, group_path)
-  nobj=long(h5g_get_num_objs(grp_id))
-  if nobj gt 0 then begin
-   for i=0L, nobj-1L do begin
-    nm=strtrim(string(h5g_get_objname_by_idx(grp_id, i)), 2)
-    if nm eq '' then continue
-    if nfound eq 0 then names=[nm] else names=[names, nm]
-    nfound+=1L
-   endfor
-  endif
-  h5g_close, grp_id
-  catch, /cancel
- endif else begin
-  catch, /cancel
- endelse
-
- if (nfound eq 0) and keyword_set(infile) then begin
-  cmd='python -c "import h5py;f=h5py.File('''+string(infile)+''',''r'');g=f.get('''+string(group_path)+''');print(''\\n''.join(list(g.keys())) if g is not None else '''')"'
-  spawn, cmd, out
-  if n_elements(out) gt 0 then begin
-   w=where(strtrim(out,2) ne '', nw)
-   if nw gt 0 then begin
-    names=out[w]
-    nfound=nw
-   endif
-  endif
- endif
-
- if nfound eq 0 then return, ''
- return, names
-end
-
-function ConvertToGX__read_group, file_id, group_path, infile=infile, ok=ok
- ok=0b
- names=ConvertToGX__list_group_names(file_id, group_path, infile=infile)
- if (n_elements(names) eq 0) or ((n_elements(names) eq 1) and (strtrim(string(names[0]),2) eq '')) then return, 0
-
- group_struct=0
- nadded=0L
- for i=0L, n_elements(names)-1L do begin
-  child_name=strtrim(string(names[i]), 2)
-  if child_name eq '' then continue
-  child_path=group_path+'/'+child_name
-  child_value=0
-  child_ok=0b
-
-  catch, errg
-  if errg eq 0 then begin
-   gid=h5g_open(file_id, child_path)
-   h5g_close, gid
-   child_value=ConvertToGX__read_group(file_id, child_path, infile=infile, ok=child_ok)
-   catch, /cancel
-  endif else begin
-   catch, /cancel
-   child_value=ConvertToGX__read_dataset(file_id, child_path, ok=child_ok)
-  endelse
-
-  if ~child_ok then continue
-  tag=ConvertToGX__sanitize_tag_name(child_name)
-  if nadded eq 0 then group_struct=create_struct(tag, child_value) $
-  else group_struct=create_struct(group_struct, tag, child_value)
-  nadded+=1L
- endfor
-
- if nadded eq 0 then return, 0
- ok=1b
- return, group_struct
 end
 
 function ConvertToGX__index_from_header, hdr_raw, ok=ok
@@ -528,9 +420,8 @@ function ConvertToGX, infile
  ; Convert Carrington-like longitude (0..360) to Stonyhurst-style range when needed.
  if lon gt 180d then lon=lon-360d
 
-model_id=ConvertToGX__read_dataset(file_id, '/metadata/id', ok=okid)
-execute=ConvertToGX__read_dataset(file_id, '/metadata/execute', ok=okexec)
-observer=ConvertToGX__read_group(file_id, '/observer', infile=infile, ok=okobserver)
+ model_id=ConvertToGX__read_dataset(file_id, '/metadata/id', ok=okid)
+ execute=ConvertToGX__read_dataset(file_id, '/metadata/execute', ok=okexec)
  if ~okid then model_id=file_basename(string(infile)) else model_id=string(model_id)
  if ~okexec then execute='h5->sav conversion' else execute=string(execute)
  index_header=ConvertToGX__read_dataset(file_id, '/base/index', ok=okindexhdr)
@@ -575,65 +466,37 @@ observer=ConvertToGX__read_group(file_id, '/observer', infile=infile, ok=okobser
          WAVELNTH:6173d}
  endif
 
-base={BX:double(base_bx), $
-      BY:double(base_by), $
+ base={BX:double(base_bx), $
+       BY:double(base_by), $
        BZ:double(base_bz), $
        IC:double(base_ic), $
        CHROMO_MASK:long(chromo_mask)}
- if okobserver then begin
-  box={DR:double(dr), $
-       ADD_BASE_LAYER:0, $
-       INDEX:index, $
-       REFMAPS:refmaps_ptr, $
-       ID:string(model_id), $
-       EXECUTE:string(execute), $
-       STATUS:byte(status), $
-       STARTIDX:long(startidx), $
-       ENDIDX:long(endidx), $
-       AVFIELD:double(avfield), $
-       PHYSLENGTH:double(physlength), $
-       BCUBE:float(bcube), $
-       CHROMO_IDX:long(chromo_idx), $
-       CHROMO_BCUBE:float(chromo_bcube), $
-       N_HTOT:float(n_htot), $
-       N_HI:float(n_hi), $
-       N_P:float(n_p), $
-       DZ:double(dz), $
-       CHROMO_N:float(chromo_n), $
-       CHROMO_T:float(chromo_t), $
-       CHROMO_LAYERS:long(chromo_layers), $
-       TR:long(tr), $
-       TR_H:double(tr_h), $
-       CORONA_BASE:long(corona_base), $
-       OBSERVER:observer, $
-       BASE:base}
- endif else begin
-  box={DR:double(dr), $
-       ADD_BASE_LAYER:0, $
-       INDEX:index, $
-       REFMAPS:refmaps_ptr, $
-       ID:string(model_id), $
-       EXECUTE:string(execute), $
-       STATUS:byte(status), $
-       STARTIDX:long(startidx), $
-       ENDIDX:long(endidx), $
-       AVFIELD:double(avfield), $
-       PHYSLENGTH:double(physlength), $
-       BCUBE:float(bcube), $
-       CHROMO_IDX:long(chromo_idx), $
-       CHROMO_BCUBE:float(chromo_bcube), $
-       N_HTOT:float(n_htot), $
-       N_HI:float(n_hi), $
-       N_P:float(n_p), $
-       DZ:double(dz), $
-       CHROMO_N:float(chromo_n), $
-       CHROMO_T:float(chromo_t), $
-       CHROMO_LAYERS:long(chromo_layers), $
-       TR:long(tr), $
-       TR_H:double(tr_h), $
-       CORONA_BASE:long(corona_base), $
-       BASE:base}
- endelse
+
+ box={DR:double(dr), $
+      ADD_BASE_LAYER:0, $
+      INDEX:index, $
+      REFMAPS:refmaps_ptr, $
+      ID:string(model_id), $
+      EXECUTE:string(execute), $
+      STATUS:byte(status), $
+      STARTIDX:long(startidx), $
+      ENDIDX:long(endidx), $
+      AVFIELD:double(avfield), $
+      PHYSLENGTH:double(physlength), $
+      BCUBE:float(bcube), $
+      CHROMO_IDX:long(chromo_idx), $
+      CHROMO_BCUBE:float(chromo_bcube), $
+      N_HTOT:float(n_htot), $
+      N_HI:float(n_hi), $
+      N_P:float(n_p), $
+      DZ:double(dz), $
+      CHROMO_N:float(chromo_n), $
+      CHROMO_T:float(chromo_t), $
+      CHROMO_LAYERS:long(chromo_layers), $
+      TR:long(tr), $
+      TR_H:double(tr_h), $
+      CORONA_BASE:long(corona_base), $
+      BASE:base}
 
  return, box
 end
