@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import tempfile
 from pathlib import Path
 
@@ -23,6 +24,10 @@ def _default_artifact(out_dir: Path, current: Path, pattern: str) -> Path:
         return current
     matches = sorted(out_dir.glob(pattern), key=lambda p: (p.stat().st_mtime, str(p)), reverse=True)
     return matches[0] if matches else current
+
+
+def _arg_was_provided(argv: list[str], option: str) -> bool:
+    return any(arg == option or arg.startswith(option + "=") for arg in argv)
 
 
 def _percent_diff(test: np.ndarray, truth: np.ndarray, eps: float = 1e-12) -> np.ndarray:
@@ -267,8 +272,11 @@ def main() -> None:
     )
     args = ap.parse_args()
     kind_hint = args.kind if args.kind in {"mw", "euv"} else ("euv" if "euv" in DEFAULT_PY_H5.name else "mw")
-    args.python_h5 = _default_artifact(args.out_dir, args.python_h5, f"*_py_{kind_hint}_maps.h5")
-    args.idl_sav = _default_artifact(args.out_dir, args.idl_sav, f"*_idl_{kind_hint}_maps.sav")
+    argv = sys.argv[1:]
+    if not _arg_was_provided(argv, "--python-h5"):
+        args.python_h5 = _default_artifact(args.out_dir, args.python_h5, f"*_py_{kind_hint}_maps.h5")
+    if not _arg_was_provided(argv, "--idl-sav"):
+        args.idl_sav = _default_artifact(args.out_dir, args.idl_sav, f"*_idl_{kind_hint}_maps.sav")
 
     ti_py, tv_py, freqs_py, py_meta = _load_python_h5_outputs(args.python_h5)
     kind = py_meta["kind"] if args.kind == "auto" else args.kind

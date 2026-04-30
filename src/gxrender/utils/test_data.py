@@ -71,20 +71,20 @@ def find_model_files(suffix: str | None = None) -> list[Path]:
     suffix_norm = suffix.lower() if suffix else None
     matches: list[Path] = []
     seen: set[Path] = set()
-    roots = existing_test_data_roots()
-    if not roots:
-        return matches
-    root = roots[0]
-    models_root = root / "models"
-    search_root = models_root if models_root.exists() else root
-    for path in sorted(search_root.rglob("*"), key=lambda p: (len(p.parts), str(p))):
-        if not path.is_file():
-            continue
-        if suffix_norm and path.suffix.lower() != suffix_norm:
-            continue
-        if path not in seen:
-            matches.append(path)
-            seen.add(path)
+    for root in existing_test_data_roots():
+        models_root = root / "models"
+        search_root = models_root if models_root.exists() else root
+        root_matches = sorted(search_root.rglob("*"), key=lambda p: (len(p.parts), str(p)))
+        for path in root_matches:
+            if not path.is_file():
+                continue
+            if suffix_norm and path.suffix.lower() != suffix_norm:
+                continue
+            if path not in seen:
+                matches.append(path)
+                seen.add(path)
+        if matches:
+            break
     return matches
 
 
