@@ -52,6 +52,9 @@ def test_data_setup_hint(subject: str | None = None) -> str:
     )
 
 
+test_data_setup_hint.__test__ = False
+
+
 def _find_glob(patterns: list[str], *, subject: str) -> Path:
     for root in existing_test_data_roots():
         for pattern in patterns:
