@@ -560,6 +560,12 @@ def _base_index_fits_header(model_f: h5py.File) -> fits.Header | None:
     normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
     if not normalized:
         return None
+    first_line = normalized.split("\n", 1)[0].lstrip()
+    # Older parity clone fixtures stored ``str(index)`` for the full structured
+    # SAV record here rather than FITS header text. Skip those tuple repr blobs
+    # instead of passing them to Astropy's FITS card parser.
+    if first_line.startswith("("):
+        return None
     try:
         header = fits.Header.fromstring(normalized, sep="\n")
     except Exception:
