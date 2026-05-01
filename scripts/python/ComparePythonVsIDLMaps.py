@@ -15,8 +15,8 @@ from scipy.io import readsav
 
 
 DEFAULT_OUTDIR = Path(tempfile.gettempdir()) / "gximagecomputing_validation_groundtruth"
-DEFAULT_PY_H5 = DEFAULT_OUTDIR / "test.chr.h5_py_mw_maps.h5"
-DEFAULT_IDL_SAV = DEFAULT_OUTDIR / "test.chr.sav_idl_mw_maps.sav"
+DEFAULT_PY_H5 = DEFAULT_OUTDIR / "hmi.M_720s.20201126_195831.E18S19CR.CEA.NAS.GEN.CHR.h5_py_mw_maps.h5"
+DEFAULT_IDL_SAV = DEFAULT_OUTDIR / "hmi.M_720s.20201126_195831.E18S19CR.CEA.NAS.CHR.sav_idl_mw_maps.sav"
 
 
 def _default_artifact(out_dir: Path, current: Path, pattern: str) -> Path:

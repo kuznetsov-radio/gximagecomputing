@@ -22,15 +22,16 @@ def test_test_data_locator_uses_external_raw_layout(monkeypatch, tmp_path: Path)
     response_dir.mkdir(parents=True)
     ebtel_dir.mkdir(parents=True)
 
-    (model_dir / "test.chr.h5").write_bytes(b"h5")
+    model_file = model_dir / "hmi.M_720s.20201126_195831.E18S19CR.CEA.NAS.GEN.CHR.h5"
+    model_file.write_bytes(b"h5")
     (response_dir / "resp_aia_20251126T153431.sav").write_bytes(b"response")
     (ebtel_dir / "ebtel.sav").write_bytes(b"ebtel")
 
     monkeypatch.setenv("GXRENDER_TEST_DATA_ROOT", str(raw_root))
 
-    assert find_model_file("test.chr.h5") == model_dir / "test.chr.h5"
-    assert find_model_files(".h5") == [model_dir / "test.chr.h5"]
-    assert find_default_model_file(".h5") == model_dir / "test.chr.h5"
+    assert find_model_file(model_file.name) == model_file
+    assert find_model_files(".h5") == [model_file]
+    assert find_default_model_file(".h5") == model_file
     assert find_response_file("aia") == response_dir / "resp_aia_20251126T153431.sav"
     assert find_ebtel_file("ebtel.sav") == ebtel_dir / "ebtel.sav"
 

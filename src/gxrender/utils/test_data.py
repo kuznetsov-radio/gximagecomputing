@@ -170,7 +170,7 @@ def _build_parser() -> argparse.ArgumentParser:
     default_model.add_argument("--suffix", default=None, help="Optional suffix filter, e.g. .h5 or .sav")
 
     model = sub.add_parser("model", help="Print the path to a model file.")
-    model.add_argument("name", help="Model filename, e.g. test.chr.h5")
+    model.add_argument("name", help="Model filename, e.g. hmi.M_720s.20201126_195831.E18S19CR.CEA.NAS.GEN.CHR.h5")
 
     response = sub.add_parser("response", help="Print the path to an EUV response file.")
     response.add_argument("instrument", help="Instrument key, e.g. aia or stereo-a")

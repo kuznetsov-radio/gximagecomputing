@@ -34,7 +34,7 @@ def _parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(
         description=(
             "Seed an extracted gxrender fixture directory from an IDL CHR SAV file by "
-            "copying to test.chr.sav and converting to test.chr.h5."
+            "copying it under its source filename and converting it to a matching H5."
         )
     )
     p.add_argument(
@@ -65,8 +65,8 @@ def main() -> None:
     if not idl_file.exists():
         raise FileNotFoundError(f"Input SAV not found: {idl_file}")
 
-    out_sav = test_data_dir / "test.chr.sav"
-    out_h5 = test_data_dir / "test.chr.h5"
+    out_sav = test_data_dir / idl_file.name
+    out_h5 = test_data_dir / f"{idl_file.stem}.h5"
 
     shutil.copy2(idl_file, out_sav)
     build_h5_from_sav(sav_path=out_sav, out_h5=out_h5, template_h5=None)
