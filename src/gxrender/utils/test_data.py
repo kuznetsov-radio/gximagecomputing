@@ -72,6 +72,14 @@ def _model_file_sort_key(path: Path) -> tuple[int, int, str]:
     return (0 if is_default_model_bundle else 1, len(path.parts), str(path))
 
 
+def _find_model_candidates(search_root: Path, suffix_norm: str | None) -> list[Path]:
+    pattern = f"*{suffix_norm}" if suffix_norm else "*"
+    return sorted(
+        (path for path in search_root.rglob(pattern) if path.is_file()),
+        key=_model_file_sort_key,
+    )
+
+
 def find_model_files(suffix: str | None = None) -> list[Path]:
     suffix_norm = suffix.lower() if suffix else None
     matches: list[Path] = []
@@ -79,12 +87,8 @@ def find_model_files(suffix: str | None = None) -> list[Path]:
     for root in existing_test_data_roots():
         models_root = root / "models"
         search_root = models_root if models_root.exists() else root
-        root_matches = sorted(search_root.rglob("*"), key=_model_file_sort_key)
+        root_matches = _find_model_candidates(search_root, suffix_norm)
         for path in root_matches:
-            if not path.is_file():
-                continue
-            if suffix_norm and path.suffix.lower() != suffix_norm:
-                continue
             if path not in seen:
                 matches.append(path)
                 seen.add(path)

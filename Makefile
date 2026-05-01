@@ -2,7 +2,7 @@
 
 PYTHON ?= python
 SAV_PATH ?= $(shell PYTHONPATH=src $(PYTHON) -m gxrender.utils.test_data default-model --suffix .sav 2>/dev/null)
-H5_PATH ?= /tmp/gximagecomputing_roundtrip_from_sav.h5
+H5_PATH ?= $(shell printf /tmp/gximagecomputing_roundtrip_from_sav.$$$$.$$(date +%s).h5)
 ATOL ?= 0
 RTOL ?= 0
 SPHINXBUILD ?= sphinx-build
