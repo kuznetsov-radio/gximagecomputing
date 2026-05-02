@@ -17,13 +17,13 @@ os.environ.setdefault(
 )
 
 from gxrender.io.model import load_model_hdf_with_metadata, load_model_sav_with_metadata
-from gxrender.utils.test_data import test_data_setup_hint as _test_data_setup_hint, try_find_model_file
+from gxrender.utils.test_data import test_data_setup_hint as _test_data_setup_hint, try_find_model_loader_parity_files
 
 
-SAV_PATH = try_find_model_file("test.chr.sav")
-H5_CLONE_PATH = try_find_model_file("test.chr.sav.clone.h5")
-if SAV_PATH is None or H5_CLONE_PATH is None:
+MODEL_LOADER_PARITY_FILES = try_find_model_loader_parity_files()
+if MODEL_LOADER_PARITY_FILES is None:
     pytest.skip(_test_data_setup_hint("loader parity fixtures"), allow_module_level=True)
+SAV_PATH, H5_CLONE_PATH = MODEL_LOADER_PARITY_FILES
 
 OVERRIDE_DSUN_CM = 1.4321098765e13
 OVERRIDE_LONC_DEG = 23.456789

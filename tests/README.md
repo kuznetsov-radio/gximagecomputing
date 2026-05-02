@@ -67,7 +67,7 @@ make parity-roundtrip \
 If your fixture directory is under Dropbox/iCloud and file locking interferes, prefer a temporary output file:
 
 ```bash
-make parity-roundtrip H5_PATH=/tmp/test.chr.h5
+make parity-roundtrip H5_PATH=/tmp/gximagecomputing_roundtrip_from_sav.h5
 ```
 
 ## Workflow Wrappers By Platform
@@ -158,8 +158,8 @@ Compare EUV outputs (correct `CORONA/TR` labels):
 ```bash
 SUNPY_CONFIGDIR=/tmp/.sunpy-config MPLCONFIGDIR=/tmp/.mplconfig XDG_CACHE_HOME=/tmp/.cache \
 PYTHONPATH=src python scripts/python/ComparePythonVsIDLEUVMaps.py \
-  --python-h5 /tmp/gximagecomputing_validation_groundtruth/test.chr.h5_py_euv_maps.h5 \
-  --idl-sav /tmp/gximagecomputing_validation_groundtruth/test.chr.sav_idl_euv_maps.sav
+  --python-h5 /tmp/gximagecomputing_validation_groundtruth/hmi.M_720s.20201126_195831.E18S19CR.CEA.NAS.GEN.CHR.h5_py_euv_maps.h5 \
+  --idl-sav /tmp/gximagecomputing_validation_groundtruth/hmi.M_720s.20201126_195831.E18S19CR.CEA.NAS.CHR.sav_idl_euv_maps.sav
 ```
 
 ## Compare Scripts

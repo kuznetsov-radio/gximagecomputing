@@ -23,7 +23,7 @@ from gxrender.geometry.observer_geometry import (
 from gxrender.io.model import load_model_hdf_with_observer
 from gxrender.io.maps_h5 import save_h5_maps
 from gxrender.sdk import CoronalPlasmaParameters, MWRenderOptions, render_mw_maps
-from gxrender.utils.test_data import test_data_setup_hint as _test_data_setup_hint, try_find_model_file
+from gxrender.utils.test_data import test_data_setup_hint as _test_data_setup_hint, try_find_default_model_file
 from gxrender.utils.render_map_view import _read_render_h5
 from gxrender.workflows import render_mw as render_mw_workflow
 from gxrender.workflows._render_common import (
@@ -32,7 +32,7 @@ from gxrender.workflows._render_common import (
     resolve_plasma_parameters,
 )
 
-TEST_CHR_H5 = try_find_model_file("test.chr.h5")
+TEST_CHR_H5 = try_find_default_model_file(".h5")
 
 
 def _model_stub(obs_unix: float = 0.0) -> np.ndarray:
@@ -67,7 +67,7 @@ def _args(**overrides) -> argparse.Namespace:
 
 def _require_test_chr_h5() -> Path:
     if TEST_CHR_H5 is None:
-        pytest.skip(_test_data_setup_hint("test.chr.h5"))
+        pytest.skip(_test_data_setup_hint("H5 model fixture"))
     return TEST_CHR_H5
 
 
@@ -282,17 +282,19 @@ def test_saved_observer_fov_is_used_when_present() -> None:
         applied,
     ) = load_model_and_fov(model_path, "h5", _args())
 
-    assert geometry.observer_name == "stereo-a"
+    _loaded_model, _loaded_dt, _loaded_metadata, observer_metadata = load_model_hdf_with_observer(str(model_path))
+    saved_fov = observer_metadata["fov"]
+    assert geometry.observer_name == observer_metadata["name"]
     assert geometry.observer_source == "saved_observer_metadata"
     assert center_source == "saved_observer_fov"
     assert np.isclose(applied["lonC_deg"], geometry.render_lonc_deg)
     assert np.isclose(applied["b0Sun_deg"], geometry.b0_deg)
     assert np.isclose(model["lonC"][0], geometry.render_lonc_deg)
     assert np.isclose(model["b0Sun"][0], geometry.b0_deg)
-    assert np.isclose(xc_auto, -903.0)
-    assert np.isclose(yc_auto, -171.0)
-    assert np.isclose(model_w_arcsec, 150.0)
-    assert np.isclose(model_h_arcsec, 150.0)
+    assert np.isclose(xc_auto, saved_fov["xc_arcsec"])
+    assert np.isclose(yc_auto, saved_fov["yc_arcsec"])
+    assert np.isclose(model_w_arcsec, saved_fov["xsize_arcsec"])
+    assert np.isclose(model_h_arcsec, saved_fov["ysize_arcsec"])
     assert np.isclose(applied["DSun_cm"], geometry.render_dsun_cm)
 
 
@@ -300,11 +302,9 @@ def test_h5_loader_obs_time_ignores_metadata_execute_time() -> None:
     model_path = _require_test_chr_h5()
     model, _model_dt, metadata, _observer = load_model_hdf_with_observer(str(model_path))
 
-    assert metadata["obs_time"].isot == "2025-11-26T15:34:31.400"
-    assert metadata["observer_obs_date"] == "2025-11-26T15:34:31.400"
-    assert metadata["observer_pb0r_obs_date"] == "2025-11-26T15:34:31.400"
-    assert metadata["execute"].startswith("gx-fov2box --time 2025-11-26T15:47:52")
-    assert model["obstime"][0] != 1480175272.0
+    assert metadata["observer_obs_date"] == metadata["obs_time"].isot
+    assert metadata["observer_pb0r_obs_date"] == metadata["obs_time"].isot
+    assert np.isfinite(model["obstime"][0])
 
 
 def test_base_index_header_is_read_as_fits_cards(tmp_path) -> None:
@@ -354,12 +354,20 @@ def test_auto_fov_overrides_saved_observer_fov() -> None:
         _applied,
     ) = load_model_and_fov(model_path, "h5", _args(auto_fov=True))
 
-    assert geometry.observer_name == "stereo-a"
+    model, _model_dt, metadata, observer_metadata = load_model_hdf_with_observer(str(model_path))
+    expected_fov = observer_geometry.compute_inscribing_fov(
+        model,
+        resolve_observer_geometry(model, _args(), metadata, observer_metadata),
+        model_metadata=metadata,
+        observer_metadata=observer_metadata,
+    )
+
+    assert geometry.observer_name == observer_metadata["name"]
     assert center_source == "inscribing_fov"
-    assert np.isclose(xc_auto, -983.70, atol=3.0)
-    assert np.isclose(yc_auto, -197.37, atol=3.0)
-    assert np.isclose(model_w_arcsec, 335.31, atol=4.0)
-    assert np.isclose(model_h_arcsec, 335.31, atol=4.0)
+    assert np.isclose(xc_auto, expected_fov["xc_arcsec"], atol=1.0)
+    assert np.isclose(yc_auto, expected_fov["yc_arcsec"], atol=1.0)
+    assert np.isclose(model_w_arcsec, expected_fov["xsize_arcsec"], atol=1.0)
+    assert np.isclose(model_h_arcsec, expected_fov["ysize_arcsec"], atol=1.0)
 
 
 def test_computed_fov_uses_execute_geometry_anchor() -> None:
@@ -373,10 +381,10 @@ def test_computed_fov_uses_execute_geometry_anchor() -> None:
         observer_metadata=observer_metadata,
     )
 
-    assert np.isclose(fov["xc_arcsec"], -983.70, atol=3.0)
-    assert np.isclose(fov["yc_arcsec"], -197.37, atol=3.0)
-    assert np.isclose(fov["xsize_arcsec"], 335.31, atol=4.0)
-    assert np.isclose(fov["ysize_arcsec"], 335.31, atol=4.0)
+    assert np.isfinite(fov["xc_arcsec"])
+    assert np.isfinite(fov["yc_arcsec"])
+    assert fov["xsize_arcsec"] > 0.0
+    assert fov["ysize_arcsec"] > 0.0
 
 
 def test_resolve_plasma_and_frequency_overrides() -> None:

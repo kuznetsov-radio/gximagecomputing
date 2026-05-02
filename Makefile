@@ -1,8 +1,8 @@
 .PHONY: parity-roundtrip parity-roundtrip-strict docs-html docs-clean
 
 PYTHON ?= python
-SAV_PATH ?= $(shell PYTHONPATH=src $(PYTHON) -m gxrender.utils.test_data model test.chr.sav 2>/dev/null)
-H5_PATH ?= $(shell PYTHONPATH=src $(PYTHON) -m gxrender.utils.test_data model test.chr.h5 2>/dev/null)
+SAV_PATH ?= $(shell PYTHONPATH=src $(PYTHON) -m gxrender.utils.test_data default-model --suffix .sav 2>/dev/null)
+H5_PATH ?= $(shell printf /tmp/gximagecomputing_roundtrip_from_sav.$$$$.$$(date +%s).h5)
 ATOL ?= 0
 RTOL ?= 0
 SPHINXBUILD ?= sphinx-build

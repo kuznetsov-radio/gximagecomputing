@@ -438,7 +438,7 @@ $SSW/packages/gx_simulator/euv/ebtel/
 
 The external fixture repository provides a packaged copy for reproducible testing, but you may also point the examples and tests at your own local SSW/GX Simulator installation.
 
-#### `test.chr.sav`
+#### SAV CHR model fixture
 
 The SAV fixture can be regenerated with the original IDL `gx_fov2box` command stored inside the file metadata:
 
@@ -448,7 +448,7 @@ gx_fov2box, '26-Nov-25 15:47:52', CENTER_ARCSEC=[ -280, -230], DX_KM= 1400, EUV=
 
 This requires an SSW/IDL environment with GX Simulator installed.
 
-#### `test.chr.h5`
+#### HDF CHR model fixture
 
 The HDF fixture can be regenerated from the Python `gx-fov2box` command stored in the HDF metadata:
 
@@ -515,25 +515,25 @@ Examples:
 MW HDF5 output:
 
 ```bash
-gxrender-map-view /tmp/gximagecomputing_validation_groundtruth/test.chr.h5_py_mw_maps.h5
+gxrender-map-view /tmp/gximagecomputing_validation_groundtruth/hmi.M_720s.20201126_195831.E18S19CR.CEA.NAS.GEN.CHR.h5_py_mw_maps.h5
 ```
 
 EUV HDF5 output:
 
 ```bash
-gxrender-map-view /tmp/gximagecomputing_validation_groundtruth/test.chr.h5_py_euv_maps.h5
+gxrender-map-view /tmp/gximagecomputing_validation_groundtruth/hmi.M_720s.20201126_195831.E18S19CR.CEA.NAS.GEN.CHR.h5_py_euv_maps.h5
 ```
 
 IDL MW SAV output:
 
 ```bash
-gxrender-map-view /tmp/gximagecomputing_validation_groundtruth/test.chr.sav_idl_mw_maps.sav
+gxrender-map-view /tmp/gximagecomputing_validation_groundtruth/hmi.M_720s.20201126_195831.E18S19CR.CEA.NAS.CHR.sav_idl_mw_maps.sav
 ```
 
 IDL EUV SAV output:
 
 ```bash
-gxrender-map-view /tmp/gximagecomputing_validation_groundtruth/test.chr.sav_idl_euv_maps.sav
+gxrender-map-view /tmp/gximagecomputing_validation_groundtruth/hmi.M_720s.20201126_195831.E18S19CR.CEA.NAS.CHR.sav_idl_euv_maps.sav
 ```
 
 Viewer behavior:

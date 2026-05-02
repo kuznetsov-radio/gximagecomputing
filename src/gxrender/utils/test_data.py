@@ -52,6 +52,9 @@ def test_data_setup_hint(subject: str | None = None) -> str:
     )
 
 
+test_data_setup_hint.__test__ = False
+
+
 def _find_glob(patterns: list[str], *, subject: str) -> Path:
     for root in existing_test_data_roots():
         for pattern in patterns:
@@ -62,6 +65,66 @@ def _find_glob(patterns: list[str], *, subject: str) -> Path:
             if matches:
                 return matches[0]
     raise FileNotFoundError(test_data_setup_hint(subject))
+
+
+def _model_file_sort_key(path: Path) -> tuple[int, int, str]:
+    is_default_model_bundle = any(part.startswith("models_") for part in path.parts)
+    return (0 if is_default_model_bundle else 1, len(path.parts), str(path))
+
+
+def _find_model_candidates(search_root: Path, suffix_norm: str | None) -> list[Path]:
+    pattern = f"*{suffix_norm}" if suffix_norm else "*"
+    return sorted(
+        (path for path in search_root.rglob(pattern) if path.is_file()),
+        key=_model_file_sort_key,
+    )
+
+
+def find_model_files(suffix: str | None = None) -> list[Path]:
+    suffix_norm = suffix.lower() if suffix else None
+    matches: list[Path] = []
+    seen: set[Path] = set()
+    for root in existing_test_data_roots():
+        models_root = root / "models"
+        search_root = models_root if models_root.exists() else root
+        root_matches = _find_model_candidates(search_root, suffix_norm)
+        for path in root_matches:
+            if path not in seen:
+                matches.append(path)
+                seen.add(path)
+        if matches:
+            break
+    return matches
+
+
+def find_model_loader_parity_files() -> tuple[Path, Path]:
+    for sav_path in find_model_files(".sav"):
+        clone_h5_path = sav_path.with_suffix(".clone.h5")
+        if clone_h5_path.is_file():
+            return sav_path, clone_h5_path
+    raise FileNotFoundError(test_data_setup_hint("loader parity fixtures"))
+
+
+def try_find_model_loader_parity_files() -> tuple[Path, Path] | None:
+    try:
+        return find_model_loader_parity_files()
+    except FileNotFoundError:
+        return None
+
+
+def find_default_model_file(suffix: str | None = None) -> Path:
+    matches = find_model_files(suffix)
+    if matches:
+        return matches[0]
+    subject = f"{suffix} model fixture" if suffix else "model fixture"
+    raise FileNotFoundError(test_data_setup_hint(subject))
+
+
+def try_find_default_model_file(suffix: str | None = None) -> Path | None:
+    try:
+        return find_default_model_file(suffix)
+    except FileNotFoundError:
+        return None
 
 
 def try_find_model_file(name: str) -> Path | None:
@@ -107,8 +170,11 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sub.add_parser("root", help="Print the first existing test-data root.")
 
+    default_model = sub.add_parser("default-model", help="Print the first installed model file.")
+    default_model.add_argument("--suffix", default=None, help="Optional suffix filter, e.g. .h5 or .sav")
+
     model = sub.add_parser("model", help="Print the path to a model file.")
-    model.add_argument("name", help="Model filename, e.g. test.chr.h5")
+    model.add_argument("name", help="Model filename, e.g. hmi.M_720s.20201126_195831.E18S19CR.CEA.NAS.GEN.CHR.h5")
 
     response = sub.add_parser("response", help="Print the path to an EUV response file.")
     response.add_argument("instrument", help="Instrument key, e.g. aia or stereo-a")
@@ -127,6 +193,8 @@ def main(argv: list[str] | None = None) -> int:
             if not roots:
                 raise FileNotFoundError(test_data_setup_hint())
             print(roots[0])
+        elif args.command == "default-model":
+            print(find_default_model_file(args.suffix))
         elif args.command == "model":
             print(find_model_file(args.name))
         elif args.command == "response":

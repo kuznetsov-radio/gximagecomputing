@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import sys
 import tempfile
 from pathlib import Path
 
@@ -14,8 +15,19 @@ from scipy.io import readsav
 
 
 DEFAULT_OUTDIR = Path(tempfile.gettempdir()) / "gximagecomputing_validation_groundtruth"
-DEFAULT_PY_H5 = DEFAULT_OUTDIR / "test.chr.h5_py_mw_maps.h5"
-DEFAULT_IDL_SAV = DEFAULT_OUTDIR / "test.chr.sav_idl_mw_maps.sav"
+DEFAULT_PY_H5 = DEFAULT_OUTDIR / "hmi.M_720s.20201126_195831.E18S19CR.CEA.NAS.GEN.CHR.h5_py_mw_maps.h5"
+DEFAULT_IDL_SAV = DEFAULT_OUTDIR / "hmi.M_720s.20201126_195831.E18S19CR.CEA.NAS.CHR.sav_idl_mw_maps.sav"
+
+
+def _default_artifact(out_dir: Path, current: Path, pattern: str) -> Path:
+    if current.exists():
+        return current
+    matches = sorted(out_dir.glob(pattern), key=lambda p: (p.stat().st_mtime, str(p)), reverse=True)
+    return matches[0] if matches else current
+
+
+def _arg_was_provided(argv: list[str], option: str) -> bool:
+    return any(arg == option or arg.startswith(option + "=") for arg in argv)
 
 
 def _percent_diff(test: np.ndarray, truth: np.ndarray, eps: float = 1e-12) -> np.ndarray:
@@ -259,6 +271,12 @@ def main() -> None:
         help="Comparison labeling mode. 'auto' infers from the Python H5 schema.",
     )
     args = ap.parse_args()
+    kind_hint = args.kind if args.kind in {"mw", "euv"} else ("euv" if "euv" in DEFAULT_PY_H5.name else "mw")
+    argv = sys.argv[1:]
+    if not _arg_was_provided(argv, "--python-h5"):
+        args.python_h5 = _default_artifact(args.out_dir, args.python_h5, f"*_py_{kind_hint}_maps.h5")
+    if not _arg_was_provided(argv, "--idl-sav"):
+        args.idl_sav = _default_artifact(args.out_dir, args.idl_sav, f"*_idl_{kind_hint}_maps.sav")
 
     ti_py, tv_py, freqs_py, py_meta = _load_python_h5_outputs(args.python_h5)
     kind = py_meta["kind"] if args.kind == "auto" else args.kind

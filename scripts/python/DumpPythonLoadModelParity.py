@@ -11,7 +11,7 @@ import h5py
 import numpy as np
 
 from gxrender.io.model import load_model_hdf_with_metadata, load_model_sav_with_metadata
-from gxrender.utils.test_data import find_model_file
+from gxrender.utils.test_data import find_default_model_file
 
 
 OVERRIDE_DSUN_CM = 1.4321098765e13
@@ -129,7 +129,7 @@ def parse_args():
 def main() -> None:
     args = parse_args()
     if args.test_data_dir is None:
-        args.test_data_dir = find_model_file("test.chr.sav").parent
+        args.test_data_dir = find_default_model_file().parent
     files = sorted(args.test_data_dir.glob("*chr*.sav")) + sorted(args.test_data_dir.glob("*chr*.h5"))
     cases = [
         ("default", {}),

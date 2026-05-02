@@ -169,6 +169,31 @@ def _normalize_czyx_from_components_or_bcube(box: Any) -> np.ndarray | None:
     return None
 
 
+def _normalize_xyzc_from_components_or_bcube(box: Any) -> np.ndarray | None:
+    czyx = _normalize_czyx_from_components_or_bcube(box)
+    if czyx is None:
+        return None
+    return czyx.transpose((3, 2, 1, 0))
+
+
+def _normalize_xyzc_from_vector_array(arr: Any) -> np.ndarray | None:
+    a = np.asarray(arr, dtype=np.float32)
+    if a.ndim == 4 and a.shape[0] == 3:
+        return a.transpose((3, 2, 1, 0))
+    if a.ndim == 4 and a.shape[-1] == 3:
+        return a
+    return None
+
+
+def _write_xyzc_components(group: h5py.Group, xyzc: np.ndarray) -> None:
+    """Write split vector components in the H5 loader's expected ``(x, y, z)`` order."""
+    if xyzc.ndim != 4 or xyzc.shape[-1] != 3:
+        raise ValueError(f"Expected vector cube with shape (x, y, z, 3), got {xyzc.shape}")
+    _replace_dataset(group, "bx", np.asarray(xyzc[..., 0], dtype=np.float32))
+    _replace_dataset(group, "by", np.asarray(xyzc[..., 1], dtype=np.float32))
+    _replace_dataset(group, "bz", np.asarray(xyzc[..., 2], dtype=np.float32))
+
+
 def _infer_stage(box: Any) -> str:
     has_chromo = _has_field(box, "CHROMO_BCUBE") and _has_field(box, "CHROMO_IDX")
     has_lines = _has_field(box, "STARTIDX") and _has_field(box, "ENDIDX") and _has_field(box, "AVFIELD")
@@ -334,10 +359,7 @@ def build_h5_from_sav(sav_path: Path, out_h5: Path, template_h5: Path | None = N
     refmaps = _extract_refmaps_from_box(box)
     dr = np.asarray(_field(box, "DR", [1.0, 1.0, 1.0]), dtype=np.float64)
 
-    bcube_czyx = _normalize_czyx_from_components_or_bcube(box)
-    bcube_xyzc = None
-    if bcube_czyx is not None:
-        bcube_xyzc = bcube_czyx.transpose((3, 2, 1, 0))
+    bcube_xyzc = _normalize_xyzc_from_components_or_bcube(box)
 
     has_lines = _has_field(box, "STARTIDX") and _has_field(box, "ENDIDX") and _has_field(box, "AVFIELD")
     has_chromo = _has_field(box, "CHROMO_BCUBE") and _has_field(box, "CHROMO_IDX")
@@ -349,11 +371,9 @@ def build_h5_from_sav(sav_path: Path, out_h5: Path, template_h5: Path | None = N
         g_grid = _ensure_group(f, "grid")
         g_meta = _ensure_group(f, "metadata")
 
-        if bcube_czyx is not None:
+        if bcube_xyzc is not None:
             g_corona = _ensure_group(f, "corona")
-            _replace_dataset(g_corona, "bx", bcube_czyx[0, :, :, :])
-            _replace_dataset(g_corona, "by", bcube_czyx[1, :, :, :])
-            _replace_dataset(g_corona, "bz", bcube_czyx[2, :, :, :])
+            _write_xyzc_components(g_corona, bcube_xyzc)
             _replace_dataset(g_corona, "dr", dr.astype(np.float64))
             corona_base = int(_field(box, "CORONA_BASE", 0))
             _replace_dataset(g_corona, "corona_base", np.array(corona_base, dtype=np.int64))
@@ -373,15 +393,9 @@ def build_h5_from_sav(sav_path: Path, out_h5: Path, template_h5: Path | None = N
 
         if has_chromo:
             g_chromo = _ensure_group(f, "chromo")
-            chromo_bcube = np.asarray(box["CHROMO_BCUBE"], dtype=np.float32)
-            if chromo_bcube.ndim == 4 and chromo_bcube.shape[0] == 3:
-                _replace_dataset(g_chromo, "bx", chromo_bcube[0, :, :, :])
-                _replace_dataset(g_chromo, "by", chromo_bcube[1, :, :, :])
-                _replace_dataset(g_chromo, "bz", chromo_bcube[2, :, :, :])
-            elif chromo_bcube.ndim == 4 and chromo_bcube.shape[-1] == 3:
-                _replace_dataset(g_chromo, "bx", chromo_bcube[:, :, :, 0])
-                _replace_dataset(g_chromo, "by", chromo_bcube[:, :, :, 1])
-                _replace_dataset(g_chromo, "bz", chromo_bcube[:, :, :, 2])
+            chromo_bcube_xyzc = _normalize_xyzc_from_vector_array(box["CHROMO_BCUBE"])
+            if chromo_bcube_xyzc is not None:
+                _write_xyzc_components(g_chromo, chromo_bcube_xyzc)
 
             if _has_field(box, "DZ"):
                 _replace_dataset(g_chromo, "dz", np.asarray(box["DZ"], dtype=np.float64))
@@ -408,8 +422,14 @@ def build_h5_from_sav(sav_path: Path, out_h5: Path, template_h5: Path | None = N
                 g_chromo.attrs["dsun_obs"] = float(_as_scalar(index["DSUN_OBS"]))
                 if "DATE_OBS" in index.dtype.names:
                     g_chromo.attrs["obs_time"] = str(_decode_if_bytes(_as_scalar(index["DATE_OBS"])))
-                if "HGLN_OBS" in index.dtype.names:
-                    g_chromo.attrs["lonC"] = float(_as_scalar(index["HGLN_OBS"]))
+                for src, dst in (
+                    ("HGLN_OBS", "hgln_obs"),
+                    ("HGLT_OBS", "hglt_obs"),
+                    ("CRLN_OBS", "crln_obs"),
+                    ("CRLT_OBS", "crlt_obs"),
+                ):
+                    if src in index.dtype.names:
+                        g_chromo.attrs[dst] = float(_as_scalar(index[src]))
 
         if base is not None:
             if "BX" in base.dtype.names:
@@ -459,7 +479,7 @@ def build_h5_from_sav(sav_path: Path, out_h5: Path, template_h5: Path | None = N
         _replace_dataset(g_meta, "disambiguation", np.bytes_("IDL"))
         _replace_dataset(g_meta, "projection", np.bytes_("CEA"))
         _replace_dataset(g_meta, "axis_order_2d", np.bytes_("yx"))
-        _replace_dataset(g_meta, "axis_order_3d", np.bytes_("zyx"))
+        _replace_dataset(g_meta, "axis_order_3d", np.bytes_("xyz"))
         _replace_dataset(g_meta, "vector_layout", np.bytes_("split_components"))
         _replace_dataset(g_meta, "stage", np.bytes_(stage))
 
