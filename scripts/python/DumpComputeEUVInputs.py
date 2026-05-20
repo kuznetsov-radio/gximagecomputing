@@ -16,9 +16,9 @@ if not os.environ.get("SUNPY_CONFIGDIR"):
     _sunpy_cfg.mkdir(parents=True, exist_ok=True)
     os.environ["SUNPY_CONFIGDIR"] = str(_sunpy_cfg)
 
-from gxrender.euv import GXEUVImageComputing, load_euv_response_sav
+from gxrender.euv import GXEUVImageComputing, build_default_aia_euv_response, load_euv_response_sav
 from gxrender.utils.test_data import find_default_model_file, test_data_setup_hint, try_find_response_file
-from gxrender.workflows._render_common import DEFAULT_OUTDIR, prepare_common_inputs
+from gxrender.workflows._render_common import DEFAULT_OUTDIR, model_obstime_iso, prepare_common_inputs
 
 
 def _example_default_shtable() -> np.ndarray:
@@ -173,17 +173,41 @@ def main() -> None:
         response, response_dt, response_meta = load_euv_response_sav(response_path)
         response_source_mode = "explicit"
     else:
-        auto_response_sav = _resolve_default_response_sav(args.instrument)
-        if auto_response_sav is not None:
-            response_path = str(auto_response_sav)
-            response, response_dt, response_meta = load_euv_response_sav(response_path)
-            response_source_mode = "auto_sav"
+        provider_error = None
+        response_path = ""
+        if str(args.instrument).strip().lower() == "aia":
+            try:
+                response, response_dt, response_meta = build_default_aia_euv_response(
+                    obstime=model_obstime_iso(common.model),
+                    channels=[str(channel) for channel in args.channels],
+                )
+                response_source_mode = "python_native"
+            except (ImportError, FileNotFoundError) as exc:
+                provider_error = exc
+                auto_response_sav = _resolve_default_response_sav(args.instrument)
+                if auto_response_sav is not None:
+                    response_path = str(auto_response_sav)
+                    response, response_dt, response_meta = load_euv_response_sav(response_path)
+                    response_source_mode = "auto_sav"
+                else:
+                    raise FileNotFoundError(
+                        "No explicit EUV response SAV was provided. The Python-native AIA response provider was unavailable, and no default response fixture could be found. "
+                        f"Provider error: {provider_error}. "
+                        + test_data_setup_hint(f"EUV response file for instrument {str(args.instrument).strip().lower()!r}")
+                        + " You may also set GXIMAGECOMPUTING_EUV_RESPONSE_SAV to an explicit SAV file."
+                    ) from provider_error
         else:
-            raise FileNotFoundError(
-                "No explicit EUV response SAV was provided, and no default response fixture could be found. "
-                + test_data_setup_hint(f"EUV response file for instrument {str(args.instrument).strip().lower()!r}")
-                + " You may also set GXIMAGECOMPUTING_EUV_RESPONSE_SAV to an explicit SAV file."
-            )
+            auto_response_sav = _resolve_default_response_sav(args.instrument)
+            if auto_response_sav is not None:
+                response_path = str(auto_response_sav)
+                response, response_dt, response_meta = load_euv_response_sav(response_path)
+                response_source_mode = "auto_sav"
+            else:
+                raise FileNotFoundError(
+                    "No explicit EUV response SAV was provided, and no default response fixture could be found. "
+                    + test_data_setup_hint(f"EUV response file for instrument {str(args.instrument).strip().lower()!r}")
+                    + " You may also set GXIMAGECOMPUTING_EUV_RESPONSE_SAV to an explicit SAV file."
+                )
 
     plasma = _example_plasma_defaults()
     coronaparms, coronaparms_dt = _build_coronaparms(

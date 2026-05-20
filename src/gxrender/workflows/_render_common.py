@@ -20,8 +20,7 @@ from gxrender.io.model import (
     estimate_hpc_center,
     infer_center_from_execute,
     infer_fov_from_execute,
-    load_model_hdf_with_observer,
-    load_model_sav_with_observer,
+    load_model_with_metadata,
 )
 
 DEFAULT_OUTDIR = (
@@ -120,17 +119,14 @@ def load_ebtel_from_arg(ebtel_path_arg: str | None) -> tuple[str, Any, Any]:
     return ebtel_path, ebtel_c, ebtel_dt
 
 
-def load_model_and_fov(
+def _load_model_and_fov_impl(
     model_path: Path,
     loader: str,
     cli_args: Any,
     *,
     prefer_execute_center: bool = True,
 ) -> tuple[Any, Any, dict[str, Any], ResolvedObserverGeometry, str, float, float, float, float, dict[str, float]]:
-    if loader == "h5":
-        model, model_dt, model_metadata, observer_metadata = load_model_hdf_with_observer(str(model_path))
-    else:
-        model, model_dt, model_metadata, observer_metadata = load_model_sav_with_observer(str(model_path))
+    model, model_dt, model_metadata, observer_metadata = load_model_with_metadata(str(model_path))
 
     observer_geometry = resolve_observer_geometry(model, cli_args, model_metadata, observer_metadata)
     applied_overrides = apply_model_observer_overrides(
@@ -145,13 +141,13 @@ def load_model_and_fov(
     )
     has_cli_view_override = any(
         getattr(cli_args, key, None) is not None
-        for key in ("xc", "yc", "xrange", "yrange", "nx", "ny", "dx", "dy", "pixel_scale_arcsec")
+        for key in ("xc", "yc", "xrange", "yrange", "nx", "ny")
     )
 
     prefer_saved_fov = not has_cli_observer_override and not has_cli_view_override
     if bool(getattr(cli_args, "auto_fov", False)):
         prefer_saved_fov = False
-    if bool(getattr(cli_args, "use_saved_fov", False)):
+    if bool(getattr(cli_args, "use_saved_fov", False)) and not has_cli_observer_override:
         prefer_saved_fov = True
 
     saved_fov = None
@@ -204,6 +200,38 @@ def load_model_and_fov(
         float(model_w_arcsec),
         float(model_h_arcsec),
         applied_overrides,
+    )
+
+
+def load_model_and_fov(
+    model_path: Path,
+    loader: str,
+    cli_args: Any,
+    *,
+    prefer_execute_center: bool = True,
+) -> tuple[Any, Any, dict[str, Any], ResolvedObserverGeometry, str, float, float, float, float, dict[str, float]]:
+    from gxrender.policy.observer_fov_policy import resolve_observer_fov_policy
+    from gxrender.policy.contracts import ObserverFovRequest
+
+    resolved = resolve_observer_fov_policy(
+        ObserverFovRequest(
+            model_path=model_path,
+            loader=loader,
+            cli_args=cli_args,
+            prefer_execute_center=prefer_execute_center,
+        )
+    )
+    return (
+        resolved.model,
+        resolved.model_dt,
+        dict(resolved.model_metadata),
+        resolved.observer_geometry,
+        resolved.center_source,
+        float(resolved.xc_auto),
+        float(resolved.yc_auto),
+        float(resolved.model_w_arcsec),
+        float(resolved.model_h_arcsec),
+        dict(resolved.applied_overrides),
     )
 
 

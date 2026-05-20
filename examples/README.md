@@ -81,7 +81,7 @@ python examples/python/sdk/sdk_render_mw.py --model-path /path/to/your.chr.sav
 ```
 
 This example uses typed SDK options/result objects and supports `--no-save-outputs`
-for fully in-memory rendering. When MW science inputs are omitted, it applies the same example defaults as the CLI wrapper and warns.
+for fully in-memory rendering. By default, outputs are written to `/tmp/gxrender` unless another directory is specified.
 
 EUV SDK example:
 
@@ -90,7 +90,17 @@ python examples/python/sdk/sdk_render_euv.py --model-path /path/to/your.chr.sav 
 ```
 
 This example uses typed SDK options/result objects and supports `--no-save-outputs`
-for fully in-memory rendering. When EUV science inputs are omitted, it applies the example defaults and warns.
+for fully in-memory rendering. By default, outputs are written to `/tmp/gxrender` unless another directory is specified.
+
+## Python Model Loader Examples (Parity and Geometry Overrides)
+
+The scripts under `python/model_loader/` are integration examples for model-loading
+and metadata-override behavior. They are SDK-level examples, but they focus on loader
+parity/observer geometry verification rather than end-to-end MW/EUV rendering.
+
+- `python/model_loader/example_model_loader_h5_vs_sav_parity.py`
+- `python/model_loader/example_model_loader_with_ephemeris_recomputation.py`
+- `python/model_loader/example_model_loader_with_overrides.py`
 
 ## Local IDL Compile (MW/EUV)
 
@@ -99,13 +109,13 @@ When testing local IDL changes in this repository (instead of SSW-installed rout
 From the IDL prompt:
 
 ```idl
-@/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/examples/idl/compile_local_idl
+@/path/to/gximagecomputing/examples/idl/compile_local_idl
 ```
 
 For the EUV example, also compile the EUV example routine explicitly:
 
 ```idl
-.compile '/Users/gelu/Library/CloudStorage/Dropbox/@Projects/@SUNCAST-ORG/gximagecomputing/examples/idl/RenderExampleEUV.pro'
+.compile '/path/to/gximagecomputing/examples/idl/RenderExampleEUV.pro'
 ```
 
 Then run:

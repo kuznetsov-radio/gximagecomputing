@@ -13,6 +13,8 @@ import scipy.io as io
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
 from astropy.time import Time
+from pyampp.geometry import project_world_to_observer_hpc
+from pyampp.io import load_model
 from sunpy.coordinates import frames, get_earth, sun
 
 from .voxel_id import gx_box2id
@@ -184,16 +186,7 @@ def extract_center_from_execute(execute_text: str) -> tuple[float, float] | None
 
 
 def infer_center_from_execute(loader_name: str, model_path: Path) -> tuple[float, float] | None:
-    execute_text = None
-    if loader_name == "h5":
-        with h5py.File(model_path, "r") as f:
-            if "metadata" in f and "execute" in f["metadata"]:
-                execute_text = decode_if_bytes(f["metadata"]["execute"][()])
-    else:
-        data = io.readsav(str(model_path))
-        box = data.box
-        if "EXECUTE" in box.dtype.names:
-            execute_text = decode_if_bytes(box.execute[0])
+    execute_text = _load_execute_text_from_model(loader_name, model_path)
 
     if not execute_text:
         return None
@@ -208,16 +201,7 @@ def infer_fov_from_execute(
     fallback_ny: int,
     fallback_dx_cm: float,
 ) -> tuple[float, float]:
-    execute_text = None
-    if loader_name == "h5":
-        with h5py.File(model_path, "r") as f:
-            if "metadata" in f and "execute" in f["metadata"]:
-                execute_text = decode_if_bytes(f["metadata"]["execute"][()])
-    else:
-        data = io.readsav(str(model_path))
-        box = data.box
-        if "EXECUTE" in box.dtype.names:
-            execute_text = decode_if_bytes(box.execute[0])
+    execute_text = _load_execute_text_from_model(loader_name, model_path)
 
     dims, dx_km = (None, None)
     if execute_text:
@@ -265,8 +249,25 @@ def estimate_hpc_center(
         obstime=obs_time,
         observer=observer,
     )
-    center_hpc = center_hgs.transform_to(frames.Helioprojective(observer=observer, obstime=obs_time))
+    center_hpc = project_world_to_observer_hpc(center_hgs, observer=observer, obstime=obs_time)
+    if center_hpc is None:
+        center_hpc = center_hgs.transform_to(frames.Helioprojective(observer=observer, obstime=obs_time))
     return float(center_hpc.Tx.to_value(u.arcsec)), float(center_hpc.Ty.to_value(u.arcsec))
+
+
+def _load_execute_text_from_model(loader_name: str, model_path: Path) -> str | None:
+    try:
+        model_payload = load_model(model_path, strict=False)
+    except Exception:
+        return None
+
+    metadata = model_payload.get("metadata") if isinstance(model_payload, dict) else None
+    if not isinstance(metadata, dict):
+        return None
+    execute_text = decode_if_bytes(metadata.get("execute"))
+    if execute_text is None:
+        return None
+    return str(execute_text)
 
 
 @dataclass
@@ -552,12 +553,11 @@ def _decode_h5_group_raw(group: h5py.Group) -> dict[str, Any]:
     return result
 
 
-def _base_index_fits_header(model_f: h5py.File) -> fits.Header | None:
-    if "base" not in model_f or "index" not in model_f["base"]:
+def _base_index_fits_header_from_value(raw_index: Any) -> fits.Header | None:
+    if raw_index is None:
         return None
-    raw = _decode_dataset_scalar(model_f["base"]["index"])
-    text = raw if isinstance(raw, str) else str(raw)
-    normalized = text.replace("\r\n", "\n").replace("\r", "\n").strip()
+    text = decode_if_bytes(raw_index)
+    normalized = str(text).replace("\r\n", "\n").replace("\r", "\n").strip()
     if not normalized:
         return None
     first_line = normalized.split("\n", 1)[0].lstrip()
@@ -585,8 +585,18 @@ def _header_float_value(header: fits.Header, *keys: str) -> float | None:
     return None
 
 
-def _fill_header_from_base_index(model_f: h5py.File, header: Dict[str, Any]) -> None:
-    base_index = _base_index_fits_header(model_f)
+def _fill_header_from_base_index(base_index_raw: Any, header: Dict[str, Any]) -> None:
+    # Handle both raw index data and HDF5 file objects
+    if hasattr(base_index_raw, "get") and "base" in base_index_raw:
+        # This is an HDF5 file object with a "base" group
+        base_box = base_index_raw.get("base")
+        if isinstance(base_box, dict):
+            base_index_raw = base_box.get("index")
+        else:
+            # Handle h5py Group objects
+            base_index_raw = base_index_raw["base"]["index"][()] if "base" in base_index_raw and "index" in base_index_raw["base"] else None
+
+    base_index = _base_index_fits_header_from_value(base_index_raw)
     if base_index is None:
         return
 
@@ -631,113 +641,238 @@ def _fill_header_from_base_index(model_f: h5py.File, header: Dict[str, Any]) -> 
     # unless an explicit lonC override is provided by higher-level callers.
 
 
-def _build_hdf_chromo_data(file_name):
-    with h5py.File(file_name, "r") as model_f:
-        if "chromo" not in model_f:
-            raise KeyError("Missing required '/chromo' group in HDF5 model.")
-        chromo_box = model_f["chromo"]
-        model_dict = _load_h5_group(chromo_box)
-        header = {k: decode_if_bytes(v) for k, v in dict(chromo_box.attrs).items()}
+def _extract_observer_payload_metadata(observer_payload: Any, header: Dict[str, Any]) -> None:
+    if not isinstance(observer_payload, dict):
+        return
 
-        ny_hint = None
-        nx_hint = None
-        if "base" in model_f and "bx" in model_f["base"]:
-            base_shape = np.asarray(model_f["base"]["bx"][:]).shape
-            if len(base_shape) == 2:
-                ny_hint, nx_hint = int(base_shape[0]), int(base_shape[1])
+    def _copy_scalar(source: dict[str, Any], source_key: str, target_key: str) -> None:
+        if target_key in header or source_key not in source:
+            return
+        header[target_key] = decode_if_bytes(_scalar_from_any(source[source_key]))
 
-        observer_raw = None
-        observer_group = model_f.get("observer")
-        if isinstance(observer_group, h5py.Group):
-            observer_raw = _decode_h5_group_raw(observer_group)
+    _copy_scalar(observer_payload, "name", "observer_name")
+    _copy_scalar(observer_payload, "label", "observer_label")
+    _copy_scalar(observer_payload, "source", "observer_source")
 
-        if "lines" in model_f:
-            lines_box = _load_h5_group(model_f["lines"])
-            for key in ("av_field", "phys_length", "voxel_status", "start_idx", "end_idx"):
-                if key not in model_dict and key in lines_box:
-                    model_dict[key] = lines_box[key]
+    ephemeris = observer_payload.get("ephemeris")
+    if isinstance(ephemeris, dict):
+        for source_key, target_key in (
+            ("obs_date", "observer_obs_date"),
+            ("obs_time", "observer_obs_time"),
+            ("hgln_obs_deg", "observer_hgln_obs_deg"),
+            ("hglt_obs_deg", "observer_hglt_obs_deg"),
+            ("dsun_cm", "observer_dsun_cm"),
+            ("rsun_cm", "observer_rsun_cm"),
+        ):
+            _copy_scalar(ephemeris, source_key, target_key)
 
-        axis_order_3d = None
-        if "metadata" in model_f and "axis_order_3d" in model_f["metadata"]:
+    pb0r = observer_payload.get("pb0r")
+    if isinstance(pb0r, dict):
+        for source_key, target_key in (
+            ("obs_date", "observer_pb0r_obs_date"),
+            ("b0_deg", "observer_b0_deg"),
+            ("l0_deg", "observer_l0_deg"),
+            ("p_deg", "observer_p_deg"),
+            ("rsun_arcsec", "observer_rsun_arcsec"),
+        ):
+            _copy_scalar(pb0r, source_key, target_key)
+
+    fov = observer_payload.get("fov")
+    if isinstance(fov, dict):
+        for source_key, target_key in (
+            ("xc_arcsec", "observer_fov_xc_arcsec"),
+            ("yc_arcsec", "observer_fov_yc_arcsec"),
+            ("xsize_arcsec", "observer_fov_xsize_arcsec"),
+            ("ysize_arcsec", "observer_fov_ysize_arcsec"),
+            ("frame", "observer_fov_frame"),
+            ("square", "observer_fov_square"),
+        ):
+            _copy_scalar(fov, source_key, target_key)
+
+    if "observer" not in header and "observer_name" in header:
+        header["observer"] = header["observer_name"]
+
+
+def _geometry_contract_to_dict(contract: Any) -> dict[str, Any] | None:
+    if contract is None:
+        return None
+    if isinstance(contract, dict):
+        return contract
+    to_dict = getattr(contract, "to_dict", None)
+    if callable(to_dict):
+        try:
+            value = to_dict()
+            if isinstance(value, dict):
+                return value
+        except Exception:
+            return None
+    return None
+
+
+def _apply_geometry_contract_to_header(contract_dict: dict[str, Any], header: Dict[str, Any]) -> None:
+    for src_key, dst_key in (
+        ("anchor_lon_deg", "lon"),
+        ("anchor_lat_deg", "lat"),
+        ("obstime", "obs_time"),
+        ("nx", "box_nx"),
+        ("ny", "box_ny"),
+        ("nz", "box_nz"),
+        ("dr_x", "box_dr_x"),
+        ("dr_y", "box_dr_y"),
+        ("dr_z", "box_dr_z"),
+    ):
+        if dst_key in header or src_key not in contract_dict:
+            continue
+        header[dst_key] = decode_if_bytes(contract_dict[src_key])
+
+
+def _normalize_observer_payload(observer_data: dict[str, Any] | None) -> dict[str, Any] | None:
+    """Decode bytes values in observer payload for consistent string handling."""
+    if not isinstance(observer_data, dict):
+        return observer_data
+
+    normalized = {}
+    for key, value in observer_data.items():
+        if isinstance(value, dict):
+            # Recursively normalize nested dicts
+            normalized[key] = _normalize_observer_payload(value)
+        elif isinstance(value, (bytes, np.bytes_)):
+            # Decode bytes to strings
             try:
-                axis_order_3d = str(decode_if_bytes(model_f["metadata"]["axis_order_3d"][()])).strip().lower()
-            except Exception:
-                axis_order_3d = None
+                normalized[key] = value.decode('utf-8')
+            except (AttributeError, UnicodeDecodeError):
+                normalized[key] = value
+        else:
+            normalized[key] = value
+    return normalized
 
-        if "corona" in model_f:
-            corona_box = _load_h5_group(model_f["corona"])
-            if "bx" in corona_box:
-                raw_shape = np.asarray(corona_box["bx"]).shape
-                if len(raw_shape) == 3:
-                    if axis_order_3d == "zyx":
-                        header["box_nx"] = int(raw_shape[2])
-                        header["box_ny"] = int(raw_shape[1])
-                        header["box_nz"] = int(raw_shape[0])
-                    else:
-                        header["box_nx"] = int(raw_shape[0])
-                        header["box_ny"] = int(raw_shape[1])
-                        header["box_nz"] = int(raw_shape[2])
-            if "dr" not in model_dict and "dr" in corona_box:
-                model_dict["dr"] = corona_box["dr"]
-            if "dr" in corona_box:
-                try:
-                    dr_arr = np.asarray(corona_box["dr"], dtype=float).reshape(-1)
-                    if dr_arr.size >= 3:
-                        header["box_dr_x"] = float(dr_arr[0])
-                        header["box_dr_y"] = float(dr_arr[1])
-                        header["box_dr_z"] = float(dr_arr[2])
-                except Exception:
-                    pass
-            if "corona_base" not in model_dict and "corona_base" in corona_box:
-                model_dict["corona_base"] = corona_box["corona_base"]
-            if "bcube" not in model_dict:
-                if all(k in corona_box for k in ("bx", "by", "bz")):
-                    model_dict["bcube"] = _components_to_vector_cube_xyzc(
-                        corona_box["bx"], corona_box["by"], corona_box["bz"], nx_hint, ny_hint
-                    )
-                elif "bcube" in corona_box:
-                    model_dict["bcube"] = corona_box["bcube"]
 
-        if "dr" not in model_dict and "dr" in chromo_box:
-            model_dict["dr"] = chromo_box["dr"][:]
-        if "corona_base" not in model_dict and "corona_base" in chromo_box:
-            model_dict["corona_base"] = chromo_box["corona_base"][()]
-        if "chromo_bcube" not in model_dict:
-            if all(k in model_dict for k in ("bx", "by", "bz")):
-                model_dict["chromo_bcube"] = _components_to_vector_cube_xyzc(
-                    model_dict["bx"], model_dict["by"], model_dict["bz"], nx_hint, ny_hint
-                )
-            elif "chromo_bcube" in chromo_box:
-                model_dict["chromo_bcube"] = chromo_box["chromo_bcube"][:]
-        if "bcube" not in model_dict and "bcube" in chromo_box:
-            model_dict["bcube"] = chromo_box["bcube"][:]
+def _build_chromo_data_from_payload(model_payload: Dict[str, Any]) -> ChromoModelData:
+    chromo_box = model_payload.get("chromo")
+    if not isinstance(chromo_box, dict):
+        raise KeyError("Missing required '/chromo' payload in canonical model dictionary.")
 
-        if "chromo_mask" not in model_dict and "base" in model_f and "chromo_mask" in model_f["base"]:
-            model_dict["chromo_mask"] = model_f["base"]["chromo_mask"][:]
-        # Keep lonC computation centralized in load_model_dict unless explicitly overridden.
-        if "corona" in model_f:
-            for key, value in dict(model_f["corona"].attrs).items():
-                if key not in header:
-                    header[key] = decode_if_bytes(value)
-        if "metadata" in model_f:
-            for key, ds in model_f["metadata"].items():
-                if key in header:
-                    continue
-                try:
-                    value = _decode_dataset_scalar(ds)
-                except Exception:
-                    continue
-                if isinstance(value, np.ndarray) and value.size > 1:
-                    continue
+    corona_box = model_payload.get("corona") if isinstance(model_payload.get("corona"), dict) else {}
+    lines_box = model_payload.get("lines") if isinstance(model_payload.get("lines"), dict) else {}
+    base_box = model_payload.get("base") if isinstance(model_payload.get("base"), dict) else {}
+    metadata_box = model_payload.get("metadata") if isinstance(model_payload.get("metadata"), dict) else {}
+    observer_raw = model_payload.get("observer") if isinstance(model_payload.get("observer"), dict) else None
+
+    model_dict = {
+        k: v for k, v in chromo_box.items() if k not in {"attrs", "bx", "by", "bz"}
+    }
+    header: Dict[str, Any] = {}
+
+    chromo_attrs = chromo_box.get("attrs")
+    if isinstance(chromo_attrs, dict):
+        for key, value in chromo_attrs.items():
+            header[key] = decode_if_bytes(value)
+
+    corona_attrs = corona_box.get("attrs")
+    if isinstance(corona_attrs, dict):
+        for key, value in corona_attrs.items():
+            if key not in header:
                 header[key] = decode_if_bytes(value)
-        _extract_observer_group_metadata(model_f, header)
-        _fill_header_from_base_index(model_f, header)
-        if "obs_time" not in header:
-            for key in ("observer_pb0r_obs_date", "observer_obs_date", "observer_obs_time"):
-                value = header.get(key)
-                if value:
-                    header["obs_time"] = value
-                    break
+
+    for key, value in metadata_box.items():
+        if key in header or key == "geometry_contract":
+            continue
+        arr = np.asarray(value)
+        if arr.ndim > 0 and arr.size > 1:
+            continue
+        header[key] = decode_if_bytes(_scalar_from_any(value))
+
+    contract_dict = _geometry_contract_to_dict(metadata_box.get("geometry_contract"))
+    if "geometry_contract" in metadata_box and metadata_box.get("geometry_contract") is not None:
+        header["geometry_contract"] = metadata_box.get("geometry_contract")
+    if isinstance(contract_dict, dict):
+        _apply_geometry_contract_to_header(contract_dict, header)
+
+    ny_hint = None
+    nx_hint = None
+    base_bx = base_box.get("bx")
+    if base_bx is not None:
+        base_shape = np.asarray(base_bx).shape
+        if len(base_shape) == 2:
+            ny_hint, nx_hint = int(base_shape[0]), int(base_shape[1])
+
+    axis_order_3d = None
+    if "axis_order_3d" in metadata_box:
+        try:
+            axis_order_3d = str(decode_if_bytes(_scalar_from_any(metadata_box["axis_order_3d"]))).strip().lower()
+        except Exception:
+            axis_order_3d = None
+
+    if "bx" in corona_box:
+        raw_shape = np.asarray(corona_box["bx"]).shape
+        if len(raw_shape) == 3:
+            if axis_order_3d == "zyx":
+                header.setdefault("box_nx", int(raw_shape[2]))
+                header.setdefault("box_ny", int(raw_shape[1]))
+                header.setdefault("box_nz", int(raw_shape[0]))
+            else:
+                header.setdefault("box_nx", int(raw_shape[0]))
+                header.setdefault("box_ny", int(raw_shape[1]))
+                header.setdefault("box_nz", int(raw_shape[2]))
+
+    if "dr" not in model_dict and "dr" in corona_box:
+        model_dict["dr"] = corona_box["dr"]
+    if "dr" in corona_box:
+        try:
+            dr_arr = np.asarray(corona_box["dr"], dtype=float).reshape(-1)
+            if dr_arr.size >= 3:
+                header.setdefault("box_dr_x", float(dr_arr[0]))
+                header.setdefault("box_dr_y", float(dr_arr[1]))
+                header.setdefault("box_dr_z", float(dr_arr[2]))
+        except Exception:
+            pass
+    if "dr" not in model_dict and "dr" in chromo_box:
+        model_dict["dr"] = chromo_box["dr"]
+
+    if "corona_base" not in model_dict:
+        if "corona_base" in corona_box:
+            model_dict["corona_base"] = corona_box["corona_base"]
+        elif "corona_base" in chromo_box:
+            model_dict["corona_base"] = chromo_box["corona_base"]
+
+    if "bcube" not in model_dict:
+        if all(k in corona_box for k in ("bx", "by", "bz")):
+            model_dict["bcube"] = _components_to_vector_cube_xyzc(
+                corona_box["bx"], corona_box["by"], corona_box["bz"], nx_hint, ny_hint
+            )
+        elif "bcube" in corona_box:
+            model_dict["bcube"] = corona_box["bcube"]
+        elif "bcube" in chromo_box:
+            model_dict["bcube"] = chromo_box["bcube"]
+
+    if "chromo_bcube" not in model_dict:
+        if all(k in chromo_box for k in ("bx", "by", "bz")):
+            model_dict["chromo_bcube"] = _components_to_vector_cube_xyzc(
+                chromo_box["bx"], chromo_box["by"], chromo_box["bz"], nx_hint, ny_hint
+            )
+        elif "chromo_bcube" in chromo_box:
+            model_dict["chromo_bcube"] = chromo_box["chromo_bcube"]
+
+    if "chromo_mask" not in model_dict:
+        if "chromo_mask" in chromo_box:
+            model_dict["chromo_mask"] = chromo_box["chromo_mask"]
+        elif "chromo_mask" in base_box:
+            model_dict["chromo_mask"] = base_box["chromo_mask"]
+
+    for key in ("av_field", "phys_length", "voxel_status", "start_idx", "end_idx"):
+        if key not in model_dict and key in lines_box:
+            model_dict[key] = lines_box[key]
+        if key not in model_dict and key in chromo_box:
+            model_dict[key] = chromo_box[key]
+
+    _extract_observer_payload_metadata(observer_raw, header)
+    _fill_header_from_base_index(base_box.get("index"), header)
+    if "obs_time" not in header:
+        for key in ("observer_pb0r_obs_date", "observer_obs_date", "observer_obs_time"):
+            value = header.get(key)
+            if value:
+                header["obs_time"] = value
+                break
 
     execute_text = header.get("execute")
     if "dr" not in model_dict and isinstance(execute_text, str):
@@ -756,9 +891,11 @@ def _build_hdf_chromo_data(file_name):
         model_dict["chromo_bcube"] = _normalize_vector_cube_xyzc(
             np.asarray(model_dict["chromo_bcube"]), nx_hint, ny_hint
         )
+
     for key in ("av_field", "phys_length", "voxel_status", "start_idx", "end_idx"):
         if key in model_dict:
             model_dict[key] = _flatten_status_cube(model_dict[key])
+
     if "chromo_layers" in model_dict:
         model_dict["chromo_layers"] = int(_scalar_from_any(model_dict["chromo_layers"]))
     if "corona_base" not in model_dict and "bcube" in model_dict and "dz" in model_dict and "chromo_layers" in model_dict:
@@ -798,79 +935,25 @@ def _build_hdf_chromo_data(file_name):
     missing_header = [k for k in required_header if k not in header]
     if missing_header:
         raise KeyError("Missing required observation metadata fields: " + ", ".join(missing_header))
+
     header["obs_time"] = _coerce_time(header["obs_time"])
-    return ChromoModelData(header=header, model=model_dict, observer=observer_raw)
+    return ChromoModelData(header=header, model=model_dict, observer=_normalize_observer_payload(observer_raw))
+
+
+def _build_chromo_data(file_name):
+    """Load chromo model data from H5 or SAV format (auto-detected from filename)."""
+    model_payload = load_model(file_name, strict=False)
+    return _build_chromo_data_from_payload(model_payload)
+
+
+def _build_hdf_chromo_data(file_name):
+    """Deprecated: Use _build_chromo_data instead. Kept for backwards compatibility."""
+    return _build_chromo_data(file_name)
 
 
 def _build_sav_chromo_data(file_name):
-    model_data = io.readsav(file_name)
-    box = model_data.box
-    lon = box.index[0].CRVAL1[0]
-    lat = box.index[0].CRVAL2[0]
-    aptime = Time(box.index[0]["DATE_OBS"][0])
-    header = {
-        "lon": lon,
-        "lat": lat,
-        "dsun_obs": box.index[0]["DSUN_OBS"][0],
-        "obs_time": aptime,
-        "box_nx": int(box.bcube[0].shape[3]),
-        "box_ny": int(box.bcube[0].shape[2]),
-        "box_nz": int(box.bcube[0].shape[1]),
-        "box_dr_x": float(box.dr[0][0]),
-        "box_dr_y": float(box.dr[0][1]),
-        "box_dr_z": float(box.dr[0][2]),
-    }
-    if "OBSERVER" in box.index[0].dtype.names:
-        header["observer"] = decode_if_bytes(box.index[0]["OBSERVER"][0])
-    elif "OBSERVATORY" in box.index[0].dtype.names:
-        header["observer"] = decode_if_bytes(box.index[0]["OBSERVATORY"][0])
-    for key in ("HGLN_OBS", "HGLT_OBS", "CRLN_OBS", "CRLT_OBS"):
-        if key in box.index[0].dtype.names:
-            header[key.lower()] = box.index[0][key][0]
-    # Do not seed lonC directly from INDEX/HGLN_OBS here; keep model lonC
-    # derived in load_model_dict unless explicitly provided by caller.
-
-    model_dict = {
-        "dr": box.dr[0],
-        "dz": box.dz[0].transpose((2, 1, 0)),
-        "bcube": box.bcube[0].transpose((3, 2, 1, 0)),
-        "chromo_bcube": box.chromo_bcube[0].transpose((3, 2, 1, 0)),
-        "chromo_layers": box.chromo_layers[0],
-        "corona_base": box.corona_base[0],
-        "chromo_idx": box.chromo_idx[0].astype(np.int64),
-        "chromo_n": box.chromo_n[0],
-        "n_p": box.n_p[0],
-        "n_hi": box.n_hi[0],
-        "chromo_t": box.chromo_t[0],
-        "chromo_mask": box["base"][0]["chromo_mask"][0],
-    }
-
-    if "AVFIELD" in box.dtype.names:
-        model_dict["av_field"] = box.avfield[0].T.reshape(-1, order="F")
-        model_dict["phys_length"] = box.physlength[0].T.reshape(-1, order="F")
-        model_dict["voxel_status"] = box.status[0].T.reshape(-1, order="F")
-        model_dict["start_idx"] = box.startidx[0].T.reshape(-1, order="F")
-        model_dict["end_idx"] = box.endidx[0].T.reshape(-1, order="F")
-    else:
-        sc = box.bcube[0].shape
-        nx, ny = sc[3], sc[2]
-        qb = np.zeros((nx, ny, sc[1]), dtype=np.float64)
-        ql = np.zeros((nx, ny, sc[1]), dtype=np.float64)
-        uu = np.zeros((nx, ny, sc[1]), dtype=np.uint8)
-        idx = np.unravel_index(box.idx[0], qb.shape, order="F")
-        qb[idx] = box.bmed[0]
-        ql[idx] = box.length[0]
-        uu[idx] = 4
-        model_dict["av_field"] = qb.reshape(-1, order="F")
-        model_dict["phys_length"] = ql.reshape(-1, order="F")
-        model_dict["voxel_status"] = uu.reshape(-1, order="F")
-        model_dict["start_idx"] = np.zeros(qb.size, dtype=np.int64)
-        model_dict["end_idx"] = np.zeros(qb.size, dtype=np.int64)
-
-    observer_raw = None
-    if "observer" in box.dtype.names:
-        observer_raw = box["observer"][0]
-    return ChromoModelData(header=header, model=model_dict, observer=observer_raw)
+    """Deprecated: Use _build_chromo_data instead. Kept for backwards compatibility."""
+    return _build_chromo_data(file_name)
 
 
 def load_model_dict(model_dict, header):
@@ -1200,7 +1283,7 @@ def load_model_sav_with_metadata(
     return model, model_dt, dict(header)
 
 
-def load_model_hdf_with_observer(
+def load_model_with_metadata(
     file_name,
     DSun=None,
     lonC=None,
@@ -1208,33 +1291,7 @@ def load_model_hdf_with_observer(
     recompute_observer_ephemeris: bool = False,
     observer_name: str | None = None,
 ):
-    data = _build_hdf_chromo_data(file_name)
-    file_header = dict(data.header)
-    file_header.update(_file_observer_state(file_header))
-    header = _apply_loader_overrides(
-        file_header,
-        DSun=DSun,
-        lonC=lonC,
-        b0Sun=b0Sun,
-        recompute_observer_ephemeris=recompute_observer_ephemeris,
-        observer_name=observer_name,
-    )
-    model, model_dt = load_model_dict(data.model, header)
-    header["DSun"] = float(model["DSun"][0])
-    header["lonC"] = float(model["lonC"][0])
-    header["b0Sun"] = float(model["b0Sun"][0])
-    return model, model_dt, dict(header), data.observer
-
-
-def load_model_sav_with_observer(
-    file_name,
-    DSun=None,
-    lonC=None,
-    b0Sun=None,
-    recompute_observer_ephemeris: bool = False,
-    observer_name: str | None = None,
-):
-    data = _build_sav_chromo_data(file_name)
+    data = _build_chromo_data(file_name)
     file_header = dict(data.header)
     file_header.update(_file_observer_state(file_header))
     header = _apply_loader_overrides(

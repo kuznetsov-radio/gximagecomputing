@@ -20,3 +20,10 @@ docs/_build/
 
 # Local developer-only helper scripts
 local/
+
+# In-place native build artifacts (should not live in source/)
+source/*.o
+source/*.obj
+source/*.so
+source/*.dylib
+source/*.dll

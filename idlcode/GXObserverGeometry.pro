@@ -165,6 +165,7 @@ function GXObserverGeometry__extract_execute_geometry, execute_text
  if n_elements(execute_text) eq 0 then return, spec
  text=strtrim(string(execute_text), 2)
  if text eq '' then return, spec
+ upper_text=strupcase(text)
  tokens=strsplit(text, ' ', /extract)
  nt=n_elements(tokens)
  if nt le 0 then return, spec
@@ -198,6 +199,83 @@ function GXObserverGeometry__extract_execute_geometry, execute_text
   endcase
   i++
  endwhile
+
+ if ~finite(spec.center_x) or ~finite(spec.center_y) then begin
+  pos=strpos(upper_text, 'CENTER_ARCSEC')
+  if pos ge 0 then begin
+   sub=strmid(text, pos)
+   lbr=strpos(sub, '[')
+   rbr=strpos(sub, ']')
+   if (lbr ge 0) && (rbr gt lbr) then begin
+    inside=strcompress(strmid(sub, lbr+1L, rbr-lbr-1L), /remove_all)
+    vals=strsplit(inside, ',', /extract)
+    if n_elements(vals) ge 2 then begin
+     catch, err
+     if err eq 0 then begin
+      spec.center_x=double(vals[0])
+      spec.center_y=double(vals[1])
+      catch, /cancel
+     endif else begin
+      catch, /cancel
+     endelse
+    endif
+   endif
+  endif
+ endif
+
+ if (spec.nx le 0L) or (spec.ny le 0L) or (spec.nz le 0L) then begin
+  pos=strpos(upper_text, 'SIZE_PIX')
+  if pos ge 0 then begin
+   sub=strmid(text, pos)
+   lbr=strpos(sub, '[')
+   rbr=strpos(sub, ']')
+   if (lbr ge 0) && (rbr gt lbr) then begin
+    inside=strcompress(strmid(sub, lbr+1L, rbr-lbr-1L), /remove_all)
+    vals=strsplit(inside, ',', /extract)
+    if n_elements(vals) ge 3 then begin
+     catch, err
+     if err eq 0 then begin
+      spec.nx=long(vals[0])
+      spec.ny=long(vals[1])
+      spec.nz=long(vals[2])
+      catch, /cancel
+     endif else begin
+      catch, /cancel
+     endelse
+    endif
+   endif
+  endif
+ endif
+
+ if ~finite(spec.dx_km) then begin
+  pos=strpos(upper_text, 'DX_KM')
+  scale=1d0
+  if pos lt 0 then begin
+   pos=strpos(upper_text, 'BOX_RES')
+   scale=1000d0
+  endif
+  if pos ge 0 then begin
+   sub=strmid(text, pos)
+   eqpos=strpos(sub, '=')
+   if eqpos ge 0 then begin
+    rhs=strtrim(strmid(sub, eqpos+1L), 2)
+    vals=strsplit(rhs, ',', /extract)
+    if n_elements(vals) gt 0 then begin
+     tok=strtrim(vals[0], 2)
+     if tok ne '' then begin
+      catch, err
+      if err eq 0 then begin
+       spec.dx_km=double(tok)*scale
+       catch, /cancel
+      endif else begin
+       catch, /cancel
+      endelse
+     endif
+    endif
+   endif
+  endif
+ endif
+
  if spec.coord_mode eq '' then spec.coord_mode='hpc'
  if ~finite(spec.center_x) or ~finite(spec.center_y) then return, spec
  if ~finite(spec.dx_km) then return, spec
@@ -325,7 +403,7 @@ function GXObserverGeometry__execute_box_corners_hg, model, geometry, execute_te
  case spec.coord_mode of
   'hpc': begin
    wcs_conv_hpc_hg, [double(spec.center_x)], [double(spec.center_y)], lon0_arr, lat0_arr, hecr_arr, $
-    dsun_obs=double(geom_obs.dsun_cm)/100d, b0_angle=double(geom_obs.b0_deg), l0_angle=double(geom_obs.l0_deg), /arcseconds
+    dsun_obs=double(geom_obs.dsun_cm)/100d, b0_angle=double(geom_obs.b0_deg), l0_angle=double(geom_obs.l0_deg), ang_units='arcseconds', nomask=1b
    lon0=double(lon0_arr[0]) & lat0=double(lat0_arr[0]) & hecr0=double(hecr_arr[0])
   end
   'hgc': begin
@@ -457,14 +535,14 @@ function GXObserverGeometry__index_box_corners_hg, model, box_struct, index_stru
 end
 
 function GXObserverGeometry__projected_corners, model, geometry, execute_text=execute_text, box_struct=box_struct, index_struct=index_struct
- hg=GXObserverGeometry__index_box_corners_hg(model, box_struct, index_struct)
  have_exec=0b
+ hg=GXObserverGeometry__execute_box_corners_hg(model, geometry, execute_text)
  if size(hg, /n_dimensions) eq 2 then begin
   dims=size(hg, /dimensions)
   if (n_elements(dims) ge 2) and (dims[1] ge 3) and (dims[0] gt 0) then have_exec=1b
  endif
  if ~have_exec then begin
-  hg=GXObserverGeometry__execute_box_corners_hg(model, geometry, execute_text)
+  hg=GXObserverGeometry__index_box_corners_hg(model, box_struct, index_struct)
   if size(hg, /n_dimensions) eq 2 then begin
    dims=size(hg, /dimensions)
    if (n_elements(dims) ge 2) and (dims[1] ge 3) and (dims[0] gt 0) then have_exec=1b

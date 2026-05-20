@@ -11,6 +11,7 @@ generated API pages for the SDK and CLI/viewer modules.
 
    quickstart
    examples
+   euv_preview
    sdk_api
    cli_api
    viewer_api

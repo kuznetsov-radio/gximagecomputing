@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "pyGXrender"
-version = "0.0.2.3"
+version = "0.0.3.0"
 readme = "README.md"
 requires-python = ">=3.12"
 
@@ -16,6 +16,8 @@ dependencies = [
     "sunpy",
     "scipy",
     "matplotlib",
+    "pyampp>=1.0.1",
+  "pyeuvtools>=0.1,<0.3",
 ]
 
 description = "This code computes the 2D maps of the solar gyroresonance and free-free microwave emission using the models of active regions created by the GX Simulator."
@@ -82,6 +84,7 @@ LDFLAGS = "-L$(brew --prefix libomp)/lib"
 
 [project.scripts]
 gxrender-map-view = "gxrender.viz.render_map_view:main"
+gxrender-euv-preview = "gxrender.viz.regenerate_euv_preview:main"
 gxrender-mw = "gxrender.workflows.render_mw:main"
 gxrender-euv = "gxrender.workflows.render_euv:main"
 gx-sav2h5 = "gxrender.io.sav_to_h5:main"

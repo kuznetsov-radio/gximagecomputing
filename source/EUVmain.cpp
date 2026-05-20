@@ -24,20 +24,20 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  __int32 *m32=(__int32*)argv[0];
  int m_Nx=*(m32++);
  int m_Ny=*(m32++);
- int m_Nz=*(m32++); 
+ int m_Nz=*(m32++);
  int m_chromo_layers=*(m32++);
- int m_corona_layers=*(m32++); 
- int m_corona_base=*(m32++); 
+ int m_corona_layers=*(m32++);
+ int m_corona_base=*(m32++);
 
  double *m64=(double*)m32;
- double m_DSun=*(m64++); 
- double m_RSun=*(m64++); 
+ double m_DSun=*(m64++);
+ double m_RSun=*(m64++);
  double m_b0Sun=*(m64++);
  double m_lonC=*(m64++);
- double m_latC=*(m64++); 
- double m_dx=*(m64++); 
- double m_dy=*(m64++); 
- double m_dz_uniform=*(m64++); 
+ double m_latC=*(m64++);
+ double m_dx=*(m64++);
+ double m_dy=*(m64++);
+ double m_dz_uniform=*(m64++);
  m64++; //skip obstime
 
  float *m_dz=(float*)(m64);
@@ -89,7 +89,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
    e_cor+=e_NQ*e_NL*e_NT;
   }
 
-  if (DDM_on) 
+  if (DDM_on)
   {
    e_DDM_cor_run=e_cor;
    e_cor+=e_NQ*e_NL*e_NT;
@@ -117,14 +117,14 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 
  double *rs_logte=(double*)rs32;
  double *rs_all=rs_logte+rs_NT;
-        
+
  //-------------------------------------
 
- __int32 *b32=(__int32*)argv[3]; 
- int b_Nx=*(b32++); 
- int b_Ny=*(b32++); 
+ __int32 *b32=(__int32*)argv[3];
+ int b_Nx=*(b32++);
+ int b_Ny=*(b32++);
 
- double *b64=(double*)b32; 
+ double *b64=(double*)b32;
  double b_xc=*(b64++);
  double b_yc=*(b64++);
  double b_dx=*(b64++);
@@ -134,7 +134,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
  int b_projection=*(b32++);
  int ProjectionParallel=(b_projection & 1)!=0;
  int ProjectionExact=(b_projection & 2)!=0;
-         
+
  //-------------------------------------
 
  double *cp64=(double*)argv[4];
@@ -260,12 +260,12 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
   DEM_idx1=i1;
   rs_logte1=(double*)malloc(rs_NT1*sizeof(double));
   rs_te1=(double*)malloc(rs_NT1*sizeof(double));
-  for (int i=0; i<rs_NT1; i++) 
+  for (int i=0; i<rs_NT1; i++)
   {
    rs_logte1[i]=e_logtdem[i+i1];
    rs_te1[i]=pow(10.0, rs_logte1[i]);
   }
-     
+
   rs_all1=(double*)malloc(sizeof(double)*rs_NT1*rs_Nch);
   for (int j=0; j<rs_Nch; j++) for (int i=0; i<rs_NT1; i++) rs_spl_arr[j]->Interpolate(rs_logte1[i], rs_all1+i+j*rs_NT1, 0);
 
@@ -382,27 +382,27 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
     ARGV[10]=(void*)zmid;
    }
   }
-       
+
   int done=0;
   int TR_on=0;
   if (Nvoxels>0) for (int k=Nvoxels-1; k>=0; k--) if (!done)
-  {               
+  {
    flags[VoxList[k]]|=1; //voxels crossed by LOSs
 
    double T_iso=cp_Tbase; //default temperature
    double n_iso=cp_nbase*exp(-h[VoxList[k]]/H_corona); //default density
    int useDEM=0; //default: isothermal
-                     
+
    double Bavg, Lline;
    Bavg=Lline=0;
-   
+
    int ID1, ID2;
    ID1=ID2=0;
 
    int idx_i=VoxList[k] % m_Nx;
    int idx_j=(VoxList[k]/m_Nx) % m_Ny;
    int idx_k=(VoxList[k]/m_Nx)/m_Ny;
-           
+
    if (idx_k<m_chromo_layers)
    {
 	if (m_chromo_nHI[D3(m_Nx, m_Ny, idx_i, idx_j, idx_k)]>0)
@@ -435,7 +435,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 
 	double Q=cp_Q0*pow(Bavg/Bavg0, cp_a)/pow(Lline/Lline0, cp_b);
 	if (SHtable) Q*=SHtable[D2(SHsize, ID1-1, ID2-1)];
-	 
+
     if (DEM_on)
 	{
 	 double Qlog=log(Q);
@@ -466,7 +466,7 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 
 	    if ((m_VoxelID[VoxList[k]] & 4)!=0) //corona
 	    {
-	     for (int l=0; l<e_NT; l++) 
+	     for (int l=0; l<e_NT; l++)
 		  DEM_local_corona[l]=e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
                               e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
                               e_DEM_cor_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
@@ -477,23 +477,36 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
 	    {
 		 TR_on=1;
 
-		 double costheta=abs(m_Bz[VoxList[k]])/sqrt(sqr(m_Bx[VoxList[k]])+sqr(m_By[VoxList[k]])+sqr(m_Bz[VoxList[k]]));
-		 double cosphi=abs(LOS[2]);
-		 double cosphi0=sin(0.5*acos(1.0-dz[VoxList[k]]/m_RSun));
-		 double TRfactor=costheta/max(cosphi, cosphi0);
+        // Guard TR angular scaling against non-finite values.
+        // Historical edge cases could produce Inf/NaN via division by zero
+        // (|B|=0 or max(cosphi, cosphi0)=0) or acos arguments slightly
+        // outside [-1, 1] from floating-point drift. Clamp and fallback to
+        // zero contribution so EUV outputs remain finite and reviewable.
 
-		 for (int l=0; l<e_NT; l++) 
+       double Babs=sqrt(sqr(m_Bx[VoxList[k]])+sqr(m_By[VoxList[k]])+sqr(m_Bz[VoxList[k]]));
+       double costheta=(Babs>0) ? abs(m_Bz[VoxList[k]])/Babs : 0.0;
+       double cosphi=abs(LOS[2]);
+       double arg=1.0-dz[VoxList[k]]/m_RSun;
+       if (arg<-1.0) arg=-1.0;
+       if (arg>1.0) arg=1.0;
+       double cosphi0=sin(0.5*acos(arg));
+       double denom=max(cosphi, cosphi0);
+       double TRfactor=(denom>0.0) ? costheta/denom : 0.0;
+       if (!isfinite(costheta) || !isfinite(cosphi) || !isfinite(cosphi0) || !isfinite(TRfactor)) TRfactor=0.0;
+
+		 for (int l=0; l<e_NT; l++)
 		 {
 		  DEM_local_TR[l]=e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind1, Lind)]*(1.0-dL)*(1.0-dQ1)+
                           e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind1+1, Lind)]*(1.0-dL)*dQ1+
                           e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind2, Lind+1)]*dL*(1.0-dQ2)+
                           e_DEM_tr_run[D3(e_NT, e_NQ, l, Qind2+1, Lind+1)]*dL*dQ2;
 		  DEM_local_TR[l]*=TRfactor;
+        if (!isfinite(DEM_local_TR[l])) DEM_local_TR[l]=0.0;
 		 }
-	    } 
+	    }
 	   }
 	  }
-	  else flags[VoxList[k]]|=32; //EBTEL table miss (Q) 
+	  else flags[VoxList[k]]|=32; //EBTEL table miss (Q)
 	 }
 	 else flags[VoxList[k]]|=16; //EBTEL table miss (L)
 
@@ -528,8 +541,14 @@ extern "C" int ComputeEUV_fragment(int argc, void **argv)
   {
    for (int l=0; l<rs_Nch; l++)
    {
-	for (int m=0; m<rs_NT1; m++) EUV_integrand[m]=rs_all1[D2(rs_NT1, m, l)]*DEM_local_TR[DEM_idx1+m]*rs_te1[m];
-	fluxTR[D3(b_Nx, b_Ny, i, j, l)]=IntTabulated(rs_logte1, EUV_integrand, rs_NT1)*log(10.0);
+   // Keep TR response integration finite after the guarded DEM scaling above.
+   for (int m=0; m<rs_NT1; m++)
+   {
+    double tr_term=rs_all1[D2(rs_NT1, m, l)]*DEM_local_TR[DEM_idx1+m]*rs_te1[m];
+    EUV_integrand[m]=isfinite(tr_term) ? tr_term : 0.0;
+   }
+   double tr_flux=IntTabulated(rs_logte1, EUV_integrand, rs_NT1)*log(10.0);
+   fluxTR[D3(b_Nx, b_Ny, i, j, l)]=isfinite(tr_flux) ? tr_flux : 0.0;
    }
   }
  }
@@ -592,14 +611,14 @@ extern "C" int ComputeEUV(int argc, void **argv)
  __int32 *m32=(__int32*)argv[0];
  int m_Nx=*(m32++);
  int m_Ny=*(m32++);
- int m_Nz=*(m32++); 
+ int m_Nz=*(m32++);
  int m_chromo_layers=*(m32++);
 
  float *m_dz=(float*)(m32+20);
 
- __int32 *b32=(__int32*)argv[3]; 
- int b_Nx=*(b32++); 
- int b_Ny=*(b32++); 
+ __int32 *b32=(__int32*)argv[3];
+ int b_Nx=*(b32++);
+ int b_Ny=*(b32++);
  b32++;
  int projection=*(b32++);
  int Nthreads=projection>>16;
@@ -633,7 +652,7 @@ extern "C" int ComputeEUV(int argc, void **argv)
  int K=int(b_Ny/NtMax);
  int Np=b_Ny % NtMax;
  int Nm=NtMax-Np;
- 
+
  concurrency::parallel_for(0, NtMax, [&](int j)
  {
   void *ARGV[12];

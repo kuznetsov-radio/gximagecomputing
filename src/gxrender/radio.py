@@ -9,9 +9,7 @@ from .io.ebtel import load_ebtel as io_load_ebtel, load_ebtel_none as io_load_eb
 from .io.model import (
     load_model_dict as io_load_model_dict,
     load_model_hdf as io_load_model_hdf,
-    load_model_hdf_with_observer as io_load_model_hdf_with_observer,
     load_model_sav as io_load_model_sav,
-    load_model_sav_with_observer as io_load_model_sav_with_observer,
 )
 
 
@@ -67,35 +65,34 @@ class GXRadioImageComputing:
 
         if system == "Windows":
             candidates.extend([
+                binaries_dir / "RenderGRFF_64.dll",
+                binaries_dir / "RenderGRFF_32.dll",
                 module_dir / "RenderGRFF.pyd",
                 module_dir / "RenderGRFF_64.dll",
                 module_dir / "RenderGRFF_32.dll",
             ])
             candidates.extend(package_local)
-            candidates.extend([
-                binaries_dir / "RenderGRFF_64.dll",
-                binaries_dir / "RenderGRFF_32.dll",
-            ])
         elif system == "Darwin":
-            candidates.extend([
-                module_dir / f"RenderGRFF_{arch}.so",
-                module_dir / "RenderGRFF.so",
-            ])
-            # Prefer package-local builds over shipped repo binaries so
-            # Python installs and in-place build_ext outputs win.
-            candidates.extend(package_local)
+            # Prefer canonical repo binaries first; package-local build outputs
+            # are only a fallback for ad hoc development workflows.
             candidates.extend([
                 binaries_dir / f"RenderGRFF_{arch}.so",
                 binaries_dir / "RenderGRFF.so",
+                binaries_dir / f"RenderGRFF_{arch}.dylib",
+                binaries_dir / "RenderGRFF.dylib",
+                module_dir / f"RenderGRFF_{arch}.so",
+                module_dir / "RenderGRFF.so",
+                module_dir / f"RenderGRFF_{arch}.dylib",
+                module_dir / "RenderGRFF.dylib",
             ])
+            candidates.extend(package_local)
         else:
             candidates.extend([
+                binaries_dir / f"RenderGRFF_{arch}.so",
+                binaries_dir / "RenderGRFF.so",
                 module_dir / "RenderGRFF.so",
             ])
             candidates.extend(package_local)
-            candidates.extend([
-                binaries_dir / "RenderGRFF.so",
-            ])
 
         resolved = []
         seen = set()
@@ -133,24 +130,6 @@ class GXRadioImageComputing:
             observer_name=observer_name,
         )
 
-    def load_model_hdf_with_observer(
-        self,
-        file_name,
-        DSun=None,
-        lonC=None,
-        b0Sun=None,
-        recompute_observer_ephemeris: bool = False,
-        observer_name: str | None = None,
-    ):
-        return io_load_model_hdf_with_observer(
-            file_name,
-            DSun=DSun,
-            lonC=lonC,
-            b0Sun=b0Sun,
-            recompute_observer_ephemeris=recompute_observer_ephemeris,
-            observer_name=observer_name,
-        )
-
     def load_model_sav(
         self,
         file_name,
@@ -161,24 +140,6 @@ class GXRadioImageComputing:
         observer_name: str | None = None,
         ):
         return io_load_model_sav(
-            file_name,
-            DSun=DSun,
-            lonC=lonC,
-            b0Sun=b0Sun,
-            recompute_observer_ephemeris=recompute_observer_ephemeris,
-            observer_name=observer_name,
-        )
-
-    def load_model_sav_with_observer(
-        self,
-        file_name,
-        DSun=None,
-        lonC=None,
-        b0Sun=None,
-        recompute_observer_ephemeris: bool = False,
-        observer_name: str | None = None,
-    ):
-        return io_load_model_sav_with_observer(
             file_name,
             DSun=DSun,
             lonC=lonC,

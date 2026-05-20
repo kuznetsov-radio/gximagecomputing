@@ -13,7 +13,6 @@ from gxrender import (
     ObserverOverrides,
     render_euv_maps,
 )
-from gxrender.utils.test_data import test_data_setup_hint, try_find_response_file
 
 
 def _warn_example_default(message: str) -> None:
@@ -25,10 +24,11 @@ def parse_args() -> argparse.Namespace:
     p.add_argument("--model-path", type=Path, required=True, help="Path to CHR model (.sav or .h5)")
     p.add_argument("--model-format", choices=["auto", "sav", "h5"], default="auto")
     p.add_argument("--ebtel-path", type=str, default=None, help="Optional EBTEL table (.sav)")
-    p.add_argument("--response-sav", type=Path, default=None, help="Optional EUV response SAV file")
+    p.add_argument("--response-sav", type=Path, default=None, help="Optional EUV response SAV override. If omitted, gximagecomputing resolves the default instrument from explicit input or observer metadata; AIA via pyEUVTools is only the no-observer fallback.")
     p.add_argument("--output-dir", type=Path, default=None, help="Output directory (used only when saving outputs)")
     p.add_argument("--output-name", type=str, default=None, help="Output H5 filename")
     p.add_argument("--instrument", type=str, default=None)
+    p.add_argument("--observer", type=str, default=None, help="Optional observer name resolved via SunPy, for example earth, stereo-a, stereo-b, or solo.")
     p.add_argument("--channels", nargs="+", default=None, help="Channel list (e.g. 94 131 171 193 211 304 335)")
     p.add_argument("--omp-threads", type=int, default=8)
     p.add_argument("--xc", type=float, default=None)
@@ -69,12 +69,6 @@ def main() -> None:
         else:
             _warn_example_default('no explicit EBTEL path was provided, so "" was used to disable DEM/DDM tables')
             args.ebtel_path = ""
-    if args.instrument is None:
-        _warn_example_default("no explicit instrument name was provided, so AIA was assumed")
-        args.instrument = "AIA"
-    if args.channels is None:
-        _warn_example_default("no explicit EUV channel list was provided, so the standard AIA channels were assumed")
-        args.channels = ["94", "131", "171", "193", "211", "304", "335"]
     if args.pixel_scale_arcsec is None and args.dx is None and args.dy is None:
         _warn_example_default("no explicit pixel scale was provided, so dx=dy=2.0 arcsec/pixel was assumed")
         args.pixel_scale_arcsec = 2.0
@@ -100,31 +94,6 @@ def main() -> None:
 
         shtable = np.load(args.shtable_path)
 
-    if args.response_sav is None:
-        env_response = os.environ.get("GXIMAGECOMPUTING_EUV_RESPONSE_SAV", "").strip()
-        if env_response:
-            response_path = Path(env_response).expanduser()
-            if not response_path.exists():
-                raise FileNotFoundError(
-                    f"GXIMAGECOMPUTING_EUV_RESPONSE_SAV points to a missing file: {response_path}"
-                )
-            _warn_example_default(
-                f"no explicit EUV response SAV was provided, so GXIMAGECOMPUTING_EUV_RESPONSE_SAV={env_response!r} was assumed"
-            )
-            args.response_sav = response_path
-        else:
-            auto_response_sav = try_find_response_file(args.instrument)
-            if auto_response_sav is None:
-                raise FileNotFoundError(
-                    "No explicit EUV response SAV was provided, and no default response fixture could be found. "
-                    + test_data_setup_hint(f"EUV response file for instrument {str(args.instrument).strip().lower()!r}")
-                    + " You may also set GXIMAGECOMPUTING_EUV_RESPONSE_SAV to an explicit SAV file."
-                )
-            _warn_example_default(
-                f"no explicit EUV response SAV was provided, so {auto_response_sav} was assumed"
-            )
-            args.response_sav = auto_response_sav
-
     response = None
     response_dt = None
     response_meta = None
@@ -138,6 +107,7 @@ def main() -> None:
             output_name=args.output_name,
             channels=args.channels,
             instrument=args.instrument,
+            observer_name=args.observer,
             response_sav=args.response_sav,
             response=response,
             response_dt=response_dt,
@@ -177,6 +147,8 @@ def main() -> None:
     print(f"center_source={result.center_source}")
     print(f"geometry={result.geometry.nx}x{result.geometry.ny} @ {result.geometry.dx_arcsec:.3f}x{result.geometry.dy_arcsec:.3f} arcsec")
     print(f"response={result.response.instrument} channels={','.join(result.response.channels)}")
+    print(f"response_source={result.response.source}")
+    print(f"response_mode={result.response.mode}")
     print(f"flux_corona shape={tuple(result.flux_corona.shape)}")
     print(f"flux_tr shape={tuple(result.flux_tr.shape)}")
     print(f"save_outputs={result.outputs.save_outputs} write_preview={result.outputs.write_preview}")

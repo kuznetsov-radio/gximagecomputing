@@ -10,6 +10,7 @@ import h5py
 import matplotlib.pyplot as plt
 import numpy as np
 import sunpy.map
+from sunpy.visualization import colormaps as sunpy_colormaps
 from astropy.io import fits
 from matplotlib.colors import LogNorm, Normalize, TwoSlopeNorm
 from matplotlib.widgets import CheckButtons, RangeSlider, Slider
@@ -34,6 +35,56 @@ def _extract_freq_from_id(map_id: str, fallback: float) -> float:
 def _extract_channel_from_id(map_id: str, fallback: str) -> str:
     m = re.search(r"\b(?:AIA\s+)?A?(94|131|171|193|211|304|335)\b", map_id, flags=re.IGNORECASE)
     return m.group(1) if m else fallback
+
+
+def _channel_token(channel: str) -> str:
+    token = str(channel or "").strip().upper().replace(" ", "")
+    if token.startswith("A") and token[1:].isdigit():
+        return token[1:]
+    return token.lower()
+
+
+def _euv_sunpy_cmap_name(instrument: str, channel: str) -> str | None:
+    instrument_key = str(instrument or "").strip().lower()
+    channel_key = _channel_token(channel)
+    cmap_candidates: list[str] = []
+
+    if instrument_key in {"aia", "sdo/aia", "sdoaia"}:
+        cmap_candidates.append(f"sdoaia{channel_key}")
+    elif instrument_key in {"euvia", "euvib", "stereo-a", "stereo-b", "stereo-a/euvi", "stereo-b/euvi"}:
+        cmap_candidates.append(f"euvi{channel_key}")
+    elif instrument_key in {"eui/fsi", "solo-fsi", "solar orbiterfsi", "solar orbiter/fsi"}:
+        cmap_candidates.append(f"solar orbiterfsi{channel_key}")
+    elif instrument_key in {"eui/hri", "solo-hri", "solar orbiterhri", "solar orbiter/hri"}:
+        if channel_key == "1216":
+            cmap_candidates.append("solar orbiterhri_lya1216")
+        else:
+            cmap_candidates.append(f"solar orbiterhri_euv{channel_key}")
+    elif instrument_key in {"trace"}:
+        cmap_candidates.append(f"trace{channel_key}")
+    elif instrument_key in {"eit", "soho/eit", "sohoeit"}:
+        cmap_candidates.append(f"sohoeit{channel_key}")
+    elif instrument_key in {"sxt", "yohkoh/sxt", "yohkohsxt"}:
+        if channel_key in {"a", "al", "openal", "thinal"}:
+            cmap_candidates.append("yohkohsxtal")
+        if channel_key in {"w", "wh", "openwh", "thinwh"}:
+            cmap_candidates.append("yohkohsxtwh")
+
+    available = getattr(sunpy_colormaps, "cmlist", {})
+    for candidate in cmap_candidates:
+        if candidate in available:
+            return candidate
+    return None
+
+
+def _panel_cmap(data: _ViewerData, idx: int, side: str) -> str:
+    if data.get("axis_kind") == "channel":
+        instrument = str(data.get("instrument", "") or "")
+        channel = str(data["axis_labels"][idx])
+        sunpy_name = _euv_sunpy_cmap_name(instrument, channel)
+        if sunpy_name:
+            return sunpy_name
+    return str(data[f"{side}_cmap"])
 
 
 def _extract_entries_from_map_container(container) -> list[dict]:
@@ -195,6 +246,7 @@ def _read_render_h5(path: Path) -> _ViewerData:
         index_header = _decode_scalar(meta["index_header"][()]) if meta is not None and "index_header" in meta else ""
         date_obs = _decode_scalar(meta["date_obs"][()]) if meta is not None and "date_obs" in meta else ""
         observer_name = _decode_scalar(meta["observer_name"][()]) if meta is not None and "observer_name" in meta else ""
+        instrument = _decode_scalar(meta["instrument"][()]) if meta is not None and "instrument" in meta else ""
 
         header_text = wcs_header or index_header
 
@@ -255,6 +307,7 @@ def _read_render_h5(path: Path) -> _ViewerData:
                 axis_kind="channel",
                 axis_values=np.arange(len(channels), dtype=np.float64),
                 axis_labels=channels,
+                instrument=instrument,
                 left_label=f"GX ({'TR' if comp_up[0].startswith('TR') else 'Corona'})",
                 right_label=f"GX ({'TR' if comp_up[1].startswith('TR') else 'Corona'})",
                 left_cmap="magma",
@@ -452,7 +505,11 @@ def _nonzero_minmax(a: np.ndarray) -> tuple[float, float]:
 def _axis_display(data: _ViewerData, idx: int) -> str:
     if data["axis_kind"] == "freq":
         return f"{float(data['axis_values'][idx]):.2f} GHz"
-    return f"AIA {data['axis_labels'][idx]}"
+    instrument = str(data.get("instrument", "") or "").strip()
+    channel = str(data["axis_labels"][idx])
+    if instrument:
+        return f"{instrument} {channel}"
+    return channel
 
 
 def _title(path: Path, panel_label: str, axis_text: str, date_obs: str, observer_suffix: str = "") -> str:
@@ -529,13 +586,13 @@ def run_viewer(path: Path, start_index: int = 0, grid_deg: float = 10.0) -> None
 
     im_left = m_left0.plot(
         axes=ax_left,
-        cmap=str(data["left_cmap"]),
+        cmap=_panel_cmap(data, idx0, "left"),
         norm=_norm_for_data(left_data, left_init_min, left_init_max, log=False),
         interpolation="nearest",
     )
     im_right = m_right0.plot(
         axes=ax_right,
-        cmap=str(data["right_cmap"]),
+        cmap=_panel_cmap(data, idx0, "right"),
         norm=_norm_for_data(right_data, right_init_min, right_init_max, log=False),
         interpolation="nearest",
     )
@@ -606,6 +663,8 @@ def run_viewer(path: Path, start_index: int = 0, grid_deg: float = 10.0) -> None
 
         left_vmin, left_vmax = left_range.val
         right_vmin, right_vmax = right_range.val
+        im_left.set_cmap(_panel_cmap(data, idx, "left"))
+        im_right.set_cmap(_panel_cmap(data, idx, "right"))
         im_left.set_norm(_norm_for_data(left, float(left_vmin), float(left_vmax), bool(state["left_log"])))
         im_right.set_norm(_norm_for_data(right, float(right_vmin), float(right_vmax), bool(state["right_log"])))
         left_info.set_text(f"{data['left_label']} range [{data['bunit']}]: ({left_vmin:.3g}, {left_vmax:.3g})")

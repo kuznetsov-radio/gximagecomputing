@@ -10,7 +10,7 @@
 ;   - Preserves `box.index` as the saved birth-certificate header.
 ;   - Mirrors the full `/observer` HDF5 subtree dynamically into
 ;     `box.observer`.
-;   - Does not rewrite `box.index` from observer metadata.
+ ;   - Does not rewrite `box.index` from observer metadata.
 ;-
 function ConvertToGX__read_dataset, file_id, dataset_path, required=required, ok=ok
  ok=0b
