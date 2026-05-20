@@ -45,7 +45,7 @@ The viewer (``gxrender-map-view``) and preview generation now automatically sele
      - ``yohkohsxtal``, ``yohkohsxtalmg``, ``yohkohsxtbe``
    * - EUI (Solar Orbiter)
      - FSI-174, HRI-EUV
-     - ``solar-orbiter-eui-fsi-174``, ``solar-orbiter-eui-hri-euv``
+   - ``solar orbiterfsi174``, ``solar orbiterhri_euv304``
 
 Fallback
 --------
