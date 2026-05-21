@@ -11,6 +11,7 @@ import sunpy.map
 import astropy.units as u
 from astropy.coordinates import SkyCoord
 from astropy.io import fits
+from pyampp.geometry import compute_inscribing_fov_from_world, world_corners_from_geometry_contract
 
 import gxrender.io.model as model_io
 from gxrender.geometry import observer_geometry
@@ -20,7 +21,7 @@ from gxrender.geometry.observer_geometry import (
     compute_sunpy_wcs_header,
     resolve_observer_geometry,
 )
-from gxrender.io.model import load_model_hdf_with_observer
+from gxrender.io.model import load_model_with_metadata
 from gxrender.io.maps_h5 import save_h5_maps
 from gxrender.sdk import CoronalPlasmaParameters, MWRenderOptions, render_mw_maps
 from gxrender.utils.test_data import test_data_setup_hint as _test_data_setup_hint, try_find_default_model_file
@@ -282,7 +283,7 @@ def test_saved_observer_fov_is_used_when_present() -> None:
         applied,
     ) = load_model_and_fov(model_path, "h5", _args())
 
-    _loaded_model, _loaded_dt, _loaded_metadata, observer_metadata = load_model_hdf_with_observer(str(model_path))
+    _loaded_model, _loaded_dt, _loaded_metadata, observer_metadata = load_model_with_metadata(str(model_path))
     saved_fov = observer_metadata["fov"]
     assert geometry.observer_name == observer_metadata["name"]
     assert geometry.observer_source == "saved_observer_metadata"
@@ -300,7 +301,7 @@ def test_saved_observer_fov_is_used_when_present() -> None:
 
 def test_h5_loader_obs_time_ignores_metadata_execute_time() -> None:
     model_path = _require_test_chr_h5()
-    model, _model_dt, metadata, _observer = load_model_hdf_with_observer(str(model_path))
+    model, _model_dt, metadata, _observer = load_model_with_metadata(str(model_path))
 
     assert metadata["observer_obs_date"] == metadata["obs_time"].isot
     assert metadata["observer_pb0r_obs_date"] == metadata["obs_time"].isot
@@ -354,7 +355,7 @@ def test_auto_fov_overrides_saved_observer_fov() -> None:
         _applied,
     ) = load_model_and_fov(model_path, "h5", _args(auto_fov=True))
 
-    model, _model_dt, metadata, observer_metadata = load_model_hdf_with_observer(str(model_path))
+    model, _model_dt, metadata, observer_metadata = load_model_with_metadata(str(model_path))
     expected_fov = observer_geometry.compute_inscribing_fov(
         model,
         resolve_observer_geometry(model, _args(), metadata, observer_metadata),
@@ -370,9 +371,28 @@ def test_auto_fov_overrides_saved_observer_fov() -> None:
     assert np.isclose(model_h_arcsec, expected_fov["ysize_arcsec"], atol=1.0)
 
 
+def test_cli_observer_override_ignores_saved_fov_even_when_requested() -> None:
+    model_path = _require_test_chr_h5()
+    (
+        _model,
+        _model_dt,
+        _metadata,
+        geometry,
+        center_source,
+        _xc_auto,
+        _yc_auto,
+        _model_w_arcsec,
+        _model_h_arcsec,
+        _applied,
+    ) = load_model_and_fov(model_path, "h5", _args(observer="stereo-a", use_saved_fov=True))
+
+    assert geometry.observer_name == "stereo-a"
+    assert center_source == "inscribing_fov"
+
+
 def test_computed_fov_uses_execute_geometry_anchor() -> None:
     model_path = _require_test_chr_h5()
-    model, _model_dt, metadata, observer_metadata = load_model_hdf_with_observer(str(model_path))
+    model, _model_dt, metadata, observer_metadata = load_model_with_metadata(str(model_path))
     geometry = resolve_observer_geometry(model, _args(), metadata, observer_metadata)
     fov = observer_geometry.compute_inscribing_fov(
         model,
@@ -385,6 +405,53 @@ def test_computed_fov_uses_execute_geometry_anchor() -> None:
     assert np.isfinite(fov["yc_arcsec"])
     assert fov["xsize_arcsec"] > 0.0
     assert fov["ysize_arcsec"] > 0.0
+
+
+def test_inscribing_fov_matches_pyampp_geometry_for_stereo_a() -> None:
+    model_path = _require_test_chr_h5()
+    model, _model_dt, metadata, observer_metadata = load_model_with_metadata(str(model_path))
+    contract = metadata.get("geometry_contract")
+    assert contract is not None
+
+    geometry = resolve_observer_geometry(model, _args(observer="stereo-a"), metadata, observer_metadata)
+    computed = observer_geometry.compute_inscribing_fov(
+        model,
+        geometry,
+        model_metadata=metadata,
+        observer_metadata=observer_metadata,
+    )
+
+    obs_time = observer_geometry.model_time_from_model(model)
+    observer_coord = observer_geometry.build_observer_coordinate(geometry, obs_time)
+    world = world_corners_from_geometry_contract(contract, obstime=obs_time, observer=observer_coord)
+    assert world is not None
+    expected = compute_inscribing_fov_from_world(world, observer=observer_coord, obstime=obs_time, pad_arcsec=0.0)
+    assert expected is not None
+
+    xmin = float(expected["xmin_arcsec"])
+    xmax = float(expected["xmax_arcsec"])
+    ymin = float(expected["ymin_arcsec"])
+    ymax = float(expected["ymax_arcsec"])
+
+    if isinstance(observer_metadata, dict) and isinstance(observer_metadata.get("fov"), dict):
+        if bool(observer_metadata["fov"].get("square", False)):
+            side = max(xmax - xmin, ymax - ymin)
+            xc = 0.5 * (xmin + xmax)
+            yc = 0.5 * (ymin + ymax)
+            xmin = xc - 0.5 * side
+            xmax = xc + 0.5 * side
+            ymin = yc - 0.5 * side
+            ymax = yc + 0.5 * side
+
+    expected_xc = 0.5 * (xmin + xmax)
+    expected_yc = 0.5 * (ymin + ymax)
+    expected_xsize = xmax - xmin
+    expected_ysize = ymax - ymin
+
+    assert np.isclose(float(computed["xc_arcsec"]), expected_xc, atol=1e-6)
+    assert np.isclose(float(computed["yc_arcsec"]), expected_yc, atol=1e-6)
+    assert np.isclose(float(computed["xsize_arcsec"]), expected_xsize, atol=1e-6)
+    assert np.isclose(float(computed["ysize_arcsec"]), expected_ysize, atol=1e-6)
 
 
 def test_resolve_plasma_and_frequency_overrides() -> None:

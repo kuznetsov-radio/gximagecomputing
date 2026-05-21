@@ -3,6 +3,7 @@ pro RenderExampleMW, MODelfile=modelfile, EBTELfile=ebtelfile, LIBname=libname, 
                    OUTdir=outdir, OUTfile=outfile, $
                    DSUN=dsun_kw, LONC=lonc_kw, B0SUN=b0sun_kw, $
                    observer_name=observer_name_kw, recompute_observer_ephemeris=recompute_observer_ephemeris, $
+                   DUMP_DLL_INPUTS=dump_dll_inputs, $
                    AUTO_FOV=auto_fov, $
                    USE_SAVED_FOV=use_saved_fov, $
                    XC=xc, YC=yc, DX=dx, DY=dy, NX=nx, NY=ny, XRANGE=xrange, YRANGE=yrange, $
@@ -129,6 +130,7 @@ pro RenderExampleMW, MODelfile=modelfile, EBTELfile=ebtelfile, LIBname=libname, 
  resolve_routine, 'GXResolveObserverGeometry', /either
  resolve_routine, 'GXComputeInscribingFOV', /either
  resolve_routine, 'GXResolveSimboxFromObserverAndModel', /either
+ resolve_routine, 'GXDumpDLLInputs', /either
 
  tm=systime(1)
  execute_text=''
@@ -207,6 +209,12 @@ pro RenderExampleMW, MODelfile=modelfile, EBTELfile=ebtelfile, LIBname=libname, 
  simbox=MakeSimulationBox(xc, yc, dx, dy, nx, ny, freqlist)
  coronaparms=DefineCoronaParams(Tbase, nbase, Q0, a, b)
  outspace=ReserveOutputSpace(simbox)
+ if n_elements(dump_dll_inputs) gt 0 then begin
+  dumpfile=''
+  if size(dump_dll_inputs, /type) eq 7 then dumpfile=strtrim(string(dump_dll_inputs), 2)
+  if (dumpfile eq '') or (dumpfile eq '1') then dumpfile=outpath+'.dll_input.sav'
+  GXDumpDLLInputs, dumpfile, model, simbox, geom=geom, ebtel=ebtel
+ endif
  print, 'Elapsed time (loading): ', systime(1)-tm, ' s'
 
  tm=systime(1)

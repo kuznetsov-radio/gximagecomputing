@@ -294,8 +294,8 @@ result = render_euv_maps(
         model_path="/path/to/model.chr.sav",
         model_format="sav",
         ebtel_path="/path/to/ebtel.sav",
-        response_sav="/path/to/resp_aia_20251126T153431.sav",
         output_dir="/tmp/gxrender",
+    observer_name="solo",
         geometry=MapGeometry(dx=2.0, dy=2.0),
         plasma=CoronalPlasmaParameters(
             tbase=1.5e6,
@@ -316,7 +316,12 @@ result = render_euv_maps(
 )
 
 print(result.outputs.h5_path)     # None (in-memory render)
+
+print(result.response.source)
+print(result.response.mode)
 print(result.response.channels)
+
+When `response_sav` is omitted, gximagecomputing first uses any explicit instrument selection, otherwise infers the default instrument from the resolved observer metadata. AIA uses the Python-native pyEUVTools provider; `STEREO-A` and `STEREO-B` resolve through their compatibility SAV responses; `solar orbiter` defaults to `SOLO-FSI`, while `SOLO-HRI` remains an explicit user choice. If no observer metadata is available, the workflow falls back to AIA.
 flux_corona = result.flux_corona  # [ny, nx, nch]
 flux_tr = result.flux_tr          # [ny, nx, nch]
 print(result.outputs.save_outputs, result.outputs.write_preview)
@@ -385,9 +390,10 @@ python examples/python/cli/RenderExampleEUV.py \
   --model-path /path/to/your.chr.sav \
   --model-format sav \
   --ebtel-path /path/to/ebtel.sav \
-  --response-sav /path/to/resp_aia_20251126T153431.sav \
   --observer "solar orbiter"
 ```
+
+If you need to override the default AIA response source, add `--response-sav /path/to/resp_aia_20251126T153431.sav`.
 
 ### Repository Test Fixtures
 
@@ -421,8 +427,9 @@ or from `GXRENDER_TEST_DATA_ROOT` if you prefer a different location.
 The default installer populates:
 
 - `raw/models/`
-- `raw/responses/`
 - `raw/ebtel/`
+
+The `raw/responses/` fixtures remain useful as compatibility overrides and for non-Python-native paths, but AIA examples now prefer the built-in pyEUVTools response provider when no explicit SAV is supplied.
 
 ### Fixture Provenance and Regeneration
 
@@ -468,6 +475,8 @@ The response fixtures in `pyGXrender-test-data` were generated in IDL for the te
 The local helper loops over supported instruments and writes date-tagged files such as:
 
 - `resp_aia_20251126T153431.sav`
+
+These files are optional compatibility inputs. For AIA, the default gximagecomputing path now builds the response through pyEUVTools and reports the resolved `response.source` and `response.mode` in the workflow/example outputs.
 
 To regenerate them:
 
@@ -605,8 +614,7 @@ If a caller needs both the strict DLL-ready model structure and the saved
 observer metadata without reading the input model twice:
 
 - IDL: `LoadGXmodel, modelfile, observer_struct=observer, index_struct=index`
-- Python HDF5: `load_model_hdf_with_observer(...)`
-- Python SAV: `load_model_sav_with_observer(...)`
+- Python: `load_model_with_metadata(...)`
 
 These return the normal DLL-ready model plus the saved observer metadata group
 as stored in the input file. This keeps saved LOS state and saved FOV metadata
@@ -631,10 +639,16 @@ This keeps the DLL-facing `model` and `simbox` conventions unchanged while
 making the IDL path follow the same saved-observer and saved-FOV logic as the
 Python renderer.
 
-By default, the IDL render examples use the saved `observer/fov` rectangle when
-it is present and no explicit observer or view overrides were requested. To
-force a fresh inscribing-FOV computation instead, pass `/AUTO_FOV` to the IDL
-render example. `USE_SAVED_FOV` remains available as a backward-compatible
+By default, the IDL render examples use saved observer-view geometry when it is
+present and no explicit observer or view overrides were requested. The
+precedence is:
+
+- saved `observer/fov` 2D view rectangle
+- saved `observer/fov_box` projected box footprint when `observer/fov` is absent
+- recomputed observer-aligned inscribing FOV only when no saved view geometry is available
+
+To force a fresh inscribing-FOV computation instead, pass `/AUTO_FOV` to the
+IDL render example. `USE_SAVED_FOV` remains available as a backward-compatible
 alias, but the preferred interface is:
 
 - default: use saved `observer/fov` when present
@@ -671,6 +685,9 @@ gx-sav2h5 \
 
 Repository-internal parity/regression procedures (including IDL/Python parity and
 comparison scripts under `tests/`) are documented in `tests/README.md`.
+That document includes the Unix/macOS and Windows renderexample wrapper usage,
+the CI-oriented `scripts/unix/run_renderexample_parity_benchmarks.sh` driver,
+required fixture inputs, and output artifact locations.
 
 ----
 
@@ -847,7 +864,7 @@ The keyword `/DDM` should not be used, because the EUV emission depends on the D
 response = LoadEUVresponse(model.obstime [, instrument, evenorm=evenorm, chiantifix=chiantifix])
 ```
 - `model.obstime`: Observation time from `LoadGXmodel`
-- `instrument`: Choose from `'AIA'`, `'AIA2'`, `'TRACE'`, `'SXT'`, `'SOLO-FSI'`, `'SOLO-HRI'`, `'STEREO-A'`, `'STEREO-B'` (default `'AIA'`).
+- `instrument`: Choose from `'AIA'`, `'AIA2'`, `'TRACE'`, `'SXT'`, `'SOLO-FSI'`, `'SOLO-HRI'`, `'STEREO-A'`, `'STEREO-B'`. If omitted, the EUV workflow prefers an observer-derived default (`AIA` for Earth/SDO, `STEREO-A`, `STEREO-B`, or `SOLO-FSI` for Solar Orbiter) and only falls back to `AIA` when no observer metadata is available.
 - `evenorm`, `chiantifix`: AIA parameters, default=1 (see SolarSoft `aia_get_response.pro`).
 
 For backward compatibility, `LoadEUVresponse` also accepts a full model structure and will read its `OBSTIME` field, but the preferred interface is to pass the time directly.
@@ -949,6 +966,83 @@ Similar to `flagsAll`, but refers only to the *coronal* part of the model.
 
 - `flagsCorona[0]`: Total number of voxels in the coronal part crossed by lines-of-sight
 - `flagsCorona[1]`: always zero
+
+----
+
+## EUV Preview and Colormap Features
+
+**New in v0.0.3.0:** Improved EUV visualization with instrument-specific colormaps and flexible preview generation.
+
+### Instrument-Specific Colormaps
+
+The interactive viewer (`gxrender-map-view`) and preview generation automatically select instrument-appropriate colormaps from SunPy's 73 predefined EUV colormaps:
+
+- **AIA**: `sdoaia171`, `sdoaia193`, `sdoaia211`, `sdoaia335`, `sdoaia94`, `sdoaia131`
+- **STEREO EUVI**: `euvi171`, `euvi195`, `euvi284`, `euvi304`
+- **TRACE**: `trace171`, `trace195`, `trace284`
+- **Yohkoh SXT**: `yohkohsxtal`, `yohkohsxtalmg`, `yohkohsxtbe`
+- **Solar Orbiter EUI**: `solar-orbiter-eui-fsi-174`, `solar-orbiter-eui-hri-euv`
+
+Colormaps are automatically updated when switching channels with the viewer slider.
+
+### Standalone Preview CLI: `gxrender-euv-preview`
+
+Regenerate or create EUV preview PNGs from existing rendered H5 files without re-running the full workflow:
+
+```bash
+gxrender-euv-preview /path/to/rendered_euv_maps.h5 --channel-id A171
+gxrender-euv-preview /path/to/rendered_euv_maps.h5 --channel-id A284 --log-scale
+gxrender-euv-preview /path/to/rendered_euv_maps.h5 --channel-index 2 --output custom.png
+```
+
+**Key options:**
+
+- `--channel-id LABEL`: Select channel by label (e.g., "A171", "A284")
+- `--channel-index INT`: Select channel by index (0 = first channel)
+- `--output PATH`: Custom output PNG path
+- `--log-scale`: Apply log₁₀ scaling for enhanced dynamic range (reveals faint structures)
+- `--show`: Display preview interactively with matplotlib
+- `--no-save`: Suppress PNG file writing
+
+### Log-Scale Rendering
+
+The `--log-scale` flag applies log₁₀ transformation before visualization:
+
+**Linear (default):** ~95 KB PNG
+- Bright regions dominate
+- Faint structures invisible
+
+**Log scale:** ~250 KB PNG
+- Full coronal structure visible
+- Equal emphasis on bright and faint features
+- Much better dynamic range representation
+
+Used in both workflows:
+
+```bash
+# During EUV rendering
+gxrender-euv --model-path model.h5 --log-scale
+
+# On existing H5 file
+gxrender-euv-preview map.h5 --log-scale
+```
+
+### Complete Documentation
+
+See [EUV Preview and Colormap Features](docs/euv_preview.rst) in the Sphinx documentation for:
+
+- Detailed colormap tables
+- Full CLI reference
+- Python API usage examples
+- Comparative visualizations
+
+Build the docs:
+
+```bash
+pip install -r docs/requirements.txt
+make docs-html
+open docs/_build/html/euv_preview.html
+```
 
 ----
 

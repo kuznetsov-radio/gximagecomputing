@@ -12,6 +12,9 @@ import scipy.io as sio
 from .radio import GXRadioImageComputing
 
 
+_VALID_AIA_CORRECTION_STATES = frozenset({"raw", "evenorm", "evenorm_chiantifix"})
+
+
 @dataclass
 class EUVResponseMeta:
     instrument: str
@@ -82,6 +85,60 @@ def build_default_euv_response(
     response["logte"] = logte
     response["all"] = all_resp
     return response, response_dt, EUVResponseMeta(instrument=instrument.upper(), channels=[str(c) for c in channels])
+
+
+def _require_pyeuvtools_aia_bridge():
+    try:
+        from pyeuvtools.response import (
+            build_aia_temperature_response_gx_payload,
+            load_aia_hybrid_genx_export,
+            resolve_aia_hybrid_genx_export_path,
+        )
+    except ImportError as exc:
+        raise ImportError(
+            "Default AIA EUV response generation requires pyeuvtools 0.1.x and its runtime dependencies."
+        ) from exc
+    return build_aia_temperature_response_gx_payload, load_aia_hybrid_genx_export, resolve_aia_hybrid_genx_export_path
+
+
+def _normalize_aia_correction_state(correction_state: str) -> tuple[str, bool, bool]:
+    normalized = str(correction_state).strip().lower()
+    if normalized not in _VALID_AIA_CORRECTION_STATES:
+        allowed = ", ".join(sorted(_VALID_AIA_CORRECTION_STATES))
+        raise ValueError(f"Unsupported AIA correction state {correction_state!r}. Allowed values: {allowed}.")
+    return normalized, normalized in {"evenorm", "evenorm_chiantifix"}, normalized == "evenorm_chiantifix"
+
+
+def build_default_aia_euv_response(
+    *,
+    obstime: str,
+    channels: list[str] | None = None,
+    correction_state: str = "evenorm",
+) -> tuple[np.ndarray, np.dtype, EUVResponseMeta]:
+    """Build the default AIA ComputeEUV response through the released pyEUVTools bridge."""
+    build_payload, load_hybrid_export, resolve_hybrid_export_path = _require_pyeuvtools_aia_bridge()
+    normalized_correction_state, include_eve_correction, include_chiantifix = _normalize_aia_correction_state(
+        correction_state
+    )
+    export_path = resolve_hybrid_export_path()
+    export = load_hybrid_export(export_path)
+    selected_channels = [str(channel) for channel in (channels or export.channels)]
+    response, response_dt, response_meta = build_payload(
+        obstime=obstime,
+        emissivity_wavelength=export.emissivity_wavelength,
+        emissivity_logte=export.emissivity_logte,
+        emissivity=export.emissivity,
+        channels=selected_channels,
+        include_eve_correction=include_eve_correction,
+        include_chiantifix=include_chiantifix,
+        metadata={"consumer": "gxrender.euv.build_default_aia_euv_response"},
+    )
+    return response, response_dt, EUVResponseMeta(
+        instrument=str(response_meta.get("instrument", "AIA")).upper(),
+        channels=[str(channel) for channel in response_meta.get("channels", tuple(selected_channels))],
+        source=str(export_path),
+        mode=f"pyeuvtools:{normalized_correction_state}",
+    )
 
 
 def load_euv_response_sav(path: str):

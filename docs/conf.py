@@ -10,7 +10,7 @@ from pathlib import Path
 project = "pyGXrender / gxrender"
 author = "suncast-org"
 copyright = "2026, suncast-org"
-release = "0.0.2.3"
+release = "0.0.3.0"
 
 DOCS_DIR = Path(__file__).resolve().parent
 REPO_ROOT = DOCS_DIR.parent

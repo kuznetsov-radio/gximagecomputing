@@ -54,7 +54,7 @@ class MWRenderOptions:
     model_path: str | Path
     model_format: Literal["h5", "sav", "auto"] = "auto"
     ebtel_path: str | None = None
-    output_dir: str | Path | None = None
+    output_dir: str | Path | None = '/tmp/gxrender'
     output_name: str | None = None
     output_format: Literal["h5", "fits", "both"] = "h5"
     freqlist_ghz: Sequence[float] | None = None
@@ -72,10 +72,11 @@ class EUVRenderOptions:
     model_path: str | Path
     model_format: Literal["h5", "sav", "auto"] = "auto"
     ebtel_path: str | None = None
-    output_dir: str | Path | None = None
+    output_dir: str | Path | None = '/tmp/gxrender'
     output_name: str | None = None
     channels: Sequence[str] | None = None
     instrument: str | None = None
+    observer_name: str | None = None
     response_sav: str | Path | None = None
     response: Any | None = None
     response_dt: Any | None = None
@@ -351,6 +352,7 @@ def render_euv_maps(options: EUVRenderOptions) -> EUVRenderResult:
         output_name=options.output_name,
         channels=(list(options.channels) if options.channels is not None else None),
         instrument=(str(options.instrument) if options.instrument is not None else None),
+        observer=(str(options.observer_name) if options.observer_name is not None else None),
         response_sav=(Path(options.response_sav) if options.response_sav is not None else None),
         response=options.response,
         response_dt=options.response_dt,

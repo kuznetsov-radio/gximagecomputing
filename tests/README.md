@@ -8,6 +8,8 @@ public user-facing quick-start documentation.
 
 - External test-data installation
 - SAV↔H5 model parity checks
+- MW/EUV renderexample wrappers on Unix, macOS, and Windows
+- One-command Python-vs-IDL renderexample parity benchmark driver
 - IDL/Python MW/EUV map parity comparisons
 - ComputeEUV pre-DLL input dump/compare workflows
 
@@ -99,6 +101,173 @@ Default output location:
 
 - Unix/macOS wrappers: `/tmp/gximagecomputing_validation_groundtruth`
 - Windows wrappers: `%TEMP%\gximagecomputing_validation_groundtruth`
+
+These wrappers are intentionally thin launchers around the Python workflow CLIs.
+They resolve repository test fixtures, set isolated SunPy/Matplotlib cache
+directories, and then call `src/gxrender/workflows/render_euv.py` or
+`src/gxrender/workflows/render_mw.py`.
+
+Show the full option surface with:
+
+```bash
+bash scripts/unix/renderexampleeuv_test.sh --help
+bash scripts/unix/renderexamplemw_test.sh --help
+```
+
+```bat
+scripts\win\renderexampleeuv_test.bat --help
+scripts\win\renderexamplemw_test.bat --help
+```
+
+Common options shared by the Unix and Windows wrappers:
+
+- `--model-path PATH`: explicit H5/SAV model input
+- `--model-name NAME`: named model fixture from the external test-data set
+- `--ebtel PATH`: explicit EBTEL table
+- `--ebtel-name NAME`: named EBTEL fixture, default `ebtel.sav`
+- `--output-dir PATH` and `--output-name NAME`: output location/name
+- `--observer NAME`: observer override such as `earth`, `stereo-a`, `stereo-b`, or `solar orbiter`
+- `--auto-fov`: recompute the observer-aligned inscribing FOV
+- `--use-saved-fov`: force saved-FOV preference
+- `--xc`, `--yc`, `--dx`, `--dy`, `--pixel-scale-arcsec`, `--nx`, `--ny`, `--xrange`, `--yrange`: explicit map geometry
+- `--dsun-cm`, `--lonc-deg`, `--b0sun-deg`: explicit observer metadata overrides
+- `--q0`, `--a`, `--b`: closed-field heating overrides
+- `--show-maps`: open `gxrender-map-view` after rendering when available
+
+EUV-only options:
+
+- `--instrument NAME`: EUV instrument override
+- `--channels CH0 [CH1 ...]`: explicit EUV channel list
+- `--response PATH`: explicit EUV response SAV
+
+MW-only options:
+
+- `--frequencies-ghz F0 [F1 ...]`: explicit MW frequency list
+- `--freqlist-ghz F0 [F1 ...]`: alias for `--frequencies-ghz`
+
+Environment variables provide the same defaults when scripting:
+
+- `PYTHON_BIN`: Python interpreter used by the wrapper
+- `GXRENDER_TEST_DATA_ROOT`: external fixture root
+- `OUTDIR`, `OUTNAME`, `MODEL_PATH`, `MODEL_NAME`, `EBTEL_PATH`, `EBTEL_NAME`
+- `OBSERVER`, `AUTO_FOV`, `USE_SAVED_FOV`, `RUNTIME_CACHE_ROOT`
+- `MPLCONFIGDIR`, `SUNPY_CONFIGDIR`
+- `RESPONSE` for Unix EUV; `RESPONSE` or `RESPONSE_SAV` for Windows EUV
+
+Examples:
+
+```bash
+bash scripts/unix/renderexampleeuv_test.sh \
+  --model-path /path/to/model.NAS.GEN.CHR.h5 \
+  --response /path/to/aia_response.sav \
+  --channels 171 193 211 \
+  --auto-fov \
+  --output-dir /tmp/gximagecomputing_euv
+```
+
+```bash
+bash scripts/unix/renderexamplemw_test.sh \
+  --model-path /path/to/model.NAS.GEN.CHR.h5 \
+  --frequencies-ghz 5.8 8.0 10.0 \
+  --pixel-scale-arcsec 2.0 \
+  --nx 128 --ny 128 \
+  --output-dir /tmp/gximagecomputing_mw
+```
+
+Windows `cmd.exe` equivalents:
+
+```bat
+scripts\win\renderexampleeuv_test.bat ^
+  --model-path C:\data\model.NAS.GEN.CHR.h5 ^
+  --response C:\data\aia_response.sav ^
+  --channels 171 193 211 ^
+  --auto-fov ^
+  --output-dir %TEMP%\gximagecomputing_euv
+```
+
+```bat
+scripts\win\renderexamplemw_test.bat ^
+  --model-path C:\data\model.NAS.GEN.CHR.h5 ^
+  --frequencies-ghz 5.8 8.0 10.0 ^
+  --pixel-scale-arcsec 2.0 ^
+  --nx 128 --ny 128 ^
+  --output-dir %TEMP%\gximagecomputing_mw
+```
+
+## One-Command RenderExample Python-vs-IDL Benchmark
+
+`scripts/unix/run_renderexample_parity_benchmarks.sh` is the CI-oriented driver
+for end-to-end Python-vs-IDL renderexample parity. It runs the Python wrappers,
+generates temporary IDL batch files for `RenderExampleMW_test` and/or
+`RenderExampleEUV_test`, compares the output maps, and writes comparison JSON
+summaries under the output root.
+
+Basic usage:
+
+```bash
+scripts/unix/run_renderexample_parity_benchmarks.sh --help
+scripts/unix/run_renderexample_parity_benchmarks.sh --mode both
+```
+
+Modes:
+
+- `--mode mw`: MW only
+- `--mode euv`: EUV only
+- `--mode both`: MW and EUV, the default
+
+Important inputs:
+
+- `--python PATH` or `PYTHON_BIN`: Python interpreter. If omitted, the script uses `python3` or `python` from `PATH`.
+- `--idl PATH` or `IDL_BIN`: IDL launcher. If omitted, the script uses `sswidl` or `idl` from `PATH`.
+- `--model-h5 PATH` or `MODEL_H5_PATH`: H5 model input for the Python workflow.
+- `--model-sav PATH` or `MODEL_SAV_PATH`: SAV model input for the IDL workflow.
+- `--ebtel PATH` or `GXIMAGECOMPUTING_EBTEL_PATH`: EBTEL table.
+- `--response-sav PATH` or `GXIMAGECOMPUTING_EUV_RESPONSE_SAV`: EUV response SAV, required for `euv` and `both`.
+- `--outroot PATH` or `OUTROOT`: artifact root. Defaults to `$RUNNER_TEMP/gximagecomputing_renderexample_parity`, `$TMPDIR/gximagecomputing_renderexample_parity`, or `/tmp/gximagecomputing_renderexample_parity`.
+
+Prefer `MODEL_H5_PATH` plus `MODEL_SAV_PATH` in CI. `MODEL_PATH` / `--model-path`
+is kept only as a backward-compatible fallback and uses the same file for both
+Python and IDL inputs.
+
+Example local run:
+
+```bash
+scripts/unix/run_renderexample_parity_benchmarks.sh \
+  --mode both \
+  --python "$(command -v python3)" \
+  --idl "$(command -v sswidl)" \
+  --model-h5 /path/to/model.NAS.GEN.CHR.h5 \
+  --model-sav /path/to/model.NAS.CHR.sav \
+  --ebtel /path/to/ebtel.sav \
+  --response-sav /path/to/aia_response.sav \
+  --outroot /tmp/gximagecomputing_renderexample_parity
+```
+
+Example CI step:
+
+```yaml
+- name: RenderExample parity
+  run: |
+    scripts/unix/run_renderexample_parity_benchmarks.sh \
+      --mode both \
+      --model-h5 "$MODEL_H5_PATH" \
+      --model-sav "$MODEL_SAV_PATH" \
+      --ebtel "$GXIMAGECOMPUTING_EBTEL_PATH" \
+      --response-sav "$GXIMAGECOMPUTING_EUV_RESPONSE_SAV" \
+      --outroot "$RUNNER_TEMP/renderexample-parity"
+  env:
+    PYTHON_BIN: ${{ env.pythonLocation }}/bin/python
+    IDL_BIN: sswidl
+```
+
+Artifacts:
+
+- MW Python output: `$OUTROOT/mw/*_py_mw_maps.h5`
+- MW IDL output: `$OUTROOT/mw/*_idl_mw_maps.sav`
+- MW comparison JSON: `$OUTROOT/mw/comparison_python_vs_idl.json`
+- EUV Python output: `$OUTROOT/euv/*_py_euv_maps.h5`
+- EUV IDL output: `$OUTROOT/euv/*_idl_euv_maps.sav`
+- EUV comparison JSON: `$OUTROOT/euv/comparison_python_vs_idl.json`
 
 ## IDL/Python EUV Parity Mode (Same Input = Same Output)
 

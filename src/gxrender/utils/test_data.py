@@ -56,8 +56,20 @@ test_data_setup_hint.__test__ = False
 
 
 def _find_glob(patterns: list[str], *, subject: str) -> Path:
+    # Check if the first pattern is an absolute path that exists
+    if patterns:
+        first_pattern = patterns[0]
+        # Check if pattern is already absolute (not just resolves to absolute)
+        if Path(first_pattern).is_absolute():
+            first_path = Path(first_pattern).expanduser().resolve()
+            if first_path.is_file():
+                return first_path
+
     for root in existing_test_data_roots():
         for pattern in patterns:
+            # Skip if pattern is an absolute path (already tried above)
+            if Path(pattern).is_absolute():
+                continue
             matches = sorted(
                 (path for path in root.rglob(pattern) if path.is_file()),
                 key=lambda path: (len(path.parts), str(path)),

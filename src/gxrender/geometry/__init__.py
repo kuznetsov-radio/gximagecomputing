@@ -13,6 +13,7 @@ from .observer_geometry import (
     observer_summary,
     resolve_observer_geometry,
     resolve_simbox_from_observer_and_model,
+    should_use_saved_observer_fov,
 )
 
 __all__ = [
@@ -28,4 +29,5 @@ __all__ = [
     "observer_summary",
     "resolve_observer_geometry",
     "resolve_simbox_from_observer_and_model",
+    "should_use_saved_observer_fov",
 ]

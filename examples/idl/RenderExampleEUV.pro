@@ -1,10 +1,11 @@
 pro RenderExampleEUV, MODelfile=modelfile, EBTELfile=ebtelfile, RESPonsefile=responsefile, LIBname=libname, $
                     INSTRument=instrument, DSUN=dsun_kw, LONC=lonc_kw, B0SUN=b0sun_kw, $
                     observer_name=observer_name_kw, recompute_observer_ephemeris=recompute_observer_ephemeris, $
+                    DUMP_DLL_INPUTS=dump_dll_inputs, $
                     AUTO_FOV=auto_fov, $
                     USE_SAVED_FOV=use_saved_fov, $
                     XC=xc, YC=yc, DX=dx, DY=dy, NX=nx, NY=ny, $
-                    OUTfile=outfile, NO_PLOT=no_plot, _extra=_extra
+                    OUTdir=outdir, OUTfile=outfile, NO_PLOT=no_plot, _extra=_extra
 
  exdir=file_dirname(routine_filepath('RenderExampleEUV'))
  repo_root=file_dirname(file_dirname(exdir))
@@ -36,8 +37,20 @@ pro RenderExampleEUV, MODelfile=modelfile, EBTELfile=ebtelfile, RESPonsefile=res
  if n_elements(instrument) eq 0 then instrument='aia'
  if n_elements(dx) eq 0 then dx=2.0
  if n_elements(dy) eq 0 then dy=2.0
+ if n_elements(outdir) eq 0 then begin
+  if strpos(strlowcase(!version.os_family), 'windows') ge 0 then begin
+   outdir='C:/Temp/gximagecomputing_validation_groundtruth'
+  endif else begin
+   outdir='/tmp/gximagecomputing_validation_groundtruth'
+  endelse
+ endif
  if n_elements(outfile) eq 0 then outfile='EUVmaps.sav'
- outpath=file_expand_path(outfile)
+ spawn, 'mkdir -p "'+outdir+'"'
+ if strmid(outdir, strlen(outdir)-1, 1) eq '/' then begin
+  outpath=outdir+outfile
+ endif else begin
+  outpath=outdir+'/'+outfile
+ endelse
 
  ; Ensure local helper routines are preferred.
  if file_test(local_idlcodedir, /directory) then begin
@@ -63,11 +76,11 @@ pro RenderExampleEUV, MODelfile=modelfile, EBTELfile=ebtelfile, RESPonsefile=res
  if n_elements(lonc_kw) gt 0 then print, 'lonC override (deg): ', lonc_kw
  if n_elements(b0sun_kw) gt 0 then print, 'b0Sun override (deg): ', b0sun_kw
  print, 'Library:   ', libname
- print, 'Instrument:', strupcase(instrument)
 
  forward_function LoadGXmodel, LoadEBTEL, LoadEUVresponse, MakeSimulationBoxEUV, DefineCoronaParams, ReserveOutputSpaceEUV
  forward_function GXResolveObserverGeometry, GXComputeInscribingFOV, GXResolveSimboxFromObserverAndModel, $
   GXObserverGeometry__saved_fov, GXObserverGeometry__saved_square_fov
+ resolve_routine, 'GXDumpDLLInputs', /either
 
  tm=systime(1)
  execute_text=''
@@ -131,9 +144,18 @@ pro RenderExampleEUV, MODelfile=modelfile, EBTELfile=ebtelfile, RESPonsefile=res
  endif else begin
   response=LoadEUVresponse(model.obstime, instrument=instrument)
  endelse
+ effective_instrument=strupcase(instrument)
+ if tag_exist(response, 'INSTRUMENT') then effective_instrument=strtrim(string(response.instrument), 2)
+ print, 'Instrument:', effective_instrument
  simbox=MakeSimulationBoxEUV(xc, yc, dx, dy, nx, ny)
  coronaparms=DefineCoronaParams(Tbase, nbase, Q0, a, b)
  outspace=ReserveOutputSpaceEUV(simbox, response)
+ if n_elements(dump_dll_inputs) gt 0 then begin
+  dumpfile=''
+  if size(dump_dll_inputs, /type) eq 7 then dumpfile=strtrim(string(dump_dll_inputs), 2)
+  if (dumpfile eq '') or (dumpfile eq '1') then dumpfile=outpath+'.dll_input.sav'
+    GXDumpDLLInputs, dumpfile, model, simbox, geom=geom, response=response, ebtel=ebtel
+ endif
  print, 'Elapsed time (loading): ', systime(1)-tm, ' s'
 
  tm=systime(1)
@@ -154,29 +176,60 @@ pro RenderExampleEUV, MODelfile=modelfile, EBTELfile=ebtelfile, RESPonsefile=res
   m.id='GX (Corona) '+m.id
   map.setmap,nChan+k, m
  endfor
- save, map, filename=outpath, /compress
+ ; Preserve the historical direct-save path because some IDL map workflows
+ ; restore the per-channel EUV objects correctly while a repacked wrapper may not.
+ save, map, mapCorona, mapTR, filename=outpath, /compress
  print, 'Outputs:'
  print, '- saved_sav: ', outpath
+ print, '- flagsAll: ', outspace.flagsAll
+ print, '- flagsCorona: ', outspace.flagsCorona
+
+ plot_idx=0L
+ plot_idx_tr=0L
+ found_nonzero=0b
+ found_nonzero_tr=0b
+ print, 'EUV channel stats:'
+ for k=0L, nChan-1L do begin
+  mc=mapCorona.getmap(k)
+  mt=mapTR.getmap(k)
+  cmin=min(mc.data, max=cmax)
+  tmin=min(mt.data, max=tmax)
+  print, '  [', k, '] ', mc.id, '  corona=', cmin, ' .. ', cmax, '  TR=', tmin, ' .. ', tmax
+  if (~found_nonzero) && (finite(cmax)) && (cmax gt 0d) then begin
+   plot_idx=k
+   found_nonzero=1b
+  endif
+  if (~found_nonzero_tr) && (finite(tmax)) && (tmax gt 0d) then begin
+   plot_idx_tr=k
+   found_nonzero_tr=1b
+  endif
+ endfor
  
  if keyword_set(no_plot) eq 0 then begin
   window, 1, title='EUV map (corona)'
   wset, 1
   loadct, 13, /silent
-  m=mapCorona.getmap(2)
+  m=mapCorona.getmap(plot_idx)
   plot_map, m, cbar=1,_extra=_extra
 
   window, 2, title='EUV map (TR)'
   wset, 2
   loadct, 13, /silent
-  m=mapTR.getmap(2)
-  plot_map, m, cbar=1,_extra=_extra
+  if found_nonzero_tr then begin
+   m=mapTR.getmap(plot_idx_tr)
+   plot_map, m, cbar=1,_extra=_extra
+  endif else begin
+   print, 'TR plot skipped: all TR channels are zero.'
+  endelse
 
   window, 3, title='EUV map (corona + TR)'
   wset, 3
   loadct, 13, /silent
-  m=mapCorona.getmap(2)
-  mtr=mapTR.getmap(2)
-  m.data+=mtr.data
+  m=mapCorona.getmap(plot_idx)
+  if found_nonzero_tr then begin
+   mtr=mapTR.getmap(plot_idx_tr)
+   m.data+=mtr.data
+  endif
   plot_map, m, cbar=1,_extra=_extra
  endif
 end
