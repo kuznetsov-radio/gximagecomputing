@@ -65,13 +65,6 @@ function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime, DSUN=dsun_kw
   if tag_exist(box.index, 'CRVAL1') then lon_ref=double(box.index.crval1)
  endif
 
- if exist(newTime) then begin
-  obstime1=anytim(newTime)
-  ddays=(obstime1-obstime)/86400d
-  lonC+=diff_rot(ddays, latC, /synodic)
-  obstime=obstime1
- endif
-
  recompute_obs=keyword_set(recompute_observer_ephemeris)
  if ~recompute_obs then begin
   DSun=!values.d_nan
@@ -126,6 +119,13 @@ function LoadGXmodel, infile, noVoxelID=noVoxelID, newTime=newTime, DSUN=dsun_kw
  if n_elements(dsun_kw) gt 0 then DSun=double(dsun_kw)
  if n_elements(lonc_kw) gt 0 then lonC=double(lonc_kw)
  if n_elements(b0sun_kw) gt 0 then b0Sun=double(b0sun_kw)
+
+ if exist(newTime) then begin
+  obstime1=anytim(newTime)
+  ddays=(obstime1-obstime)/86400d
+  lonC+=diff_rot(ddays, latC, /synodic)
+  obstime=obstime1
+ endif
 
  dx=box.dr[0]*RSun
  dy=box.dr[1]*RSun
