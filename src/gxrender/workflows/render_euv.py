@@ -140,6 +140,7 @@ def _resolve_response_inputs(args: argparse.Namespace, *, obs_time_iso: str):
             return build_default_aia_euv_response(
                 obstime=obs_time_iso,
                 channels=None if args.channels is None else [str(channel) for channel in args.channels],
+                correction_state="evenorm_chiantifix",
             )
         except (ImportError, FileNotFoundError) as exc:
             provider_error = exc

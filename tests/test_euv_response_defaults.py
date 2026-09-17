@@ -6,6 +6,7 @@ from pathlib import Path
 import numpy as np
 import pytest
 
+from gxrender import euv as gx_euv
 from gxrender import sdk as gx_sdk
 from gxrender.euv import EUVResponseMeta
 from gxrender.geometry.observer_geometry import ResolvedObserverGeometry
@@ -95,13 +96,19 @@ def test_resolve_response_inputs_prefers_python_native_aia_provider(monkeypatch:
         instrument="AIA",
         channels=["A171"],
         source="pyeuvtools-export",
-        mode="pyeuvtools:evenorm",
+        mode="pyeuvtools:evenorm_chiantifix",
     )
+
+    received = {}
+
+    def fake_builder(**kwargs):
+        received.update(kwargs)
+        return payload, response_dt, response_meta
 
     monkeypatch.setattr(
         render_euv,
         "build_default_aia_euv_response",
-        lambda **kwargs: (payload, response_dt, response_meta),
+        fake_builder,
     )
     monkeypatch.setattr(
         render_euv,
@@ -117,6 +124,40 @@ def test_resolve_response_inputs_prefers_python_native_aia_provider(monkeypatch:
     assert response is payload
     assert resolved_dt is response_dt
     assert resolved_meta is response_meta
+    assert received["correction_state"] == "evenorm_chiantifix"
+
+
+def test_default_aia_response_requests_idl_default_corrections(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = np.zeros(1, dtype=[("ds", np.float64), ("NT", np.int32), ("Nchannels", np.int32)])
+    captured = {}
+
+    class FakeExport:
+        channels = ("94", "131", "171", "193", "211", "304", "335")
+        emissivity_wavelength = np.asarray([10.0])
+        emissivity_logte = np.asarray([6.0])
+        emissivity = np.asarray([[1.0]])
+
+    def fake_payload_builder(**kwargs):
+        captured.update(kwargs)
+        return payload, payload.dtype, {
+            "instrument": "AIA",
+            "channels": tuple(f"A{channel}" for channel in FakeExport.channels),
+        }
+
+    monkeypatch.setattr(
+        gx_euv,
+        "_require_pyeuvtools_aia_bridge",
+        lambda: (fake_payload_builder, lambda path: FakeExport(), lambda: Path("hybrid.sav")),
+    )
+
+    _response, _response_dt, metadata = gx_euv.build_default_aia_euv_response(
+        obstime="2012-07-12T04:46:25.800",
+    )
+
+    assert captured["channels"] == list(FakeExport.channels)
+    assert captured["include_eve_correction"] is True
+    assert captured["include_chiantifix"] is True
+    assert metadata.mode == "pyeuvtools:evenorm_chiantifix"
 
 
 def test_resolve_response_inputs_honors_explicit_response_sav(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -179,7 +220,7 @@ def test_sdk_result_exposes_response_source_metadata(monkeypatch: pytest.MonkeyP
             "instrument": "AIA",
             "channels": ["A171"],
             "source": "pyeuvtools-export",
-            "mode": "pyeuvtools:evenorm",
+            "mode": "pyeuvtools:evenorm_chiantifix",
         },
         "result": {
             "flux_corona": np.zeros((1, 3, 4), dtype=np.float64),
@@ -210,7 +251,7 @@ def test_sdk_result_exposes_response_source_metadata(monkeypatch: pytest.MonkeyP
     assert result.response.instrument == "AIA"
     assert result.response.channels == ["A171"]
     assert result.response.source == "pyeuvtools-export"
-    assert result.response.mode == "pyeuvtools:evenorm"
+    assert result.response.mode == "pyeuvtools:evenorm_chiantifix"
 
 
 def test_sdk_forwards_named_observer_to_euv_workflow(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
