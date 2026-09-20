@@ -185,6 +185,10 @@ def save_h5_euv_maps(
     b: float | None = None,
     corona_mode: int | None = None,
     shtable: np.ndarray | None = None,
+    parallel: bool | None = None,
+    exact: bool | None = None,
+    projection_threads: int | None = None,
+    projection_word: int | None = None,
 ) -> Path:
     cor = np.asarray(flux_corona, dtype=np.float32)  # (ny, nx, nch)
     tr = np.asarray(flux_tr, dtype=np.float32)  # (ny, nx, nch)
@@ -257,6 +261,14 @@ def save_h5_euv_maps(
             meta.create_dataset("corona_mode", data=int(corona_mode))
         if shtable is not None:
             meta.create_dataset("shtable", data=np.asarray(shtable, dtype=np.float64))
+        if parallel is not None:
+            meta.create_dataset("projection_parallel", data=bool(parallel))
+        if exact is not None:
+            meta.create_dataset("projection_exact", data=bool(exact))
+        if projection_threads is not None:
+            meta.create_dataset("projection_threads", data=int(projection_threads))
+        if projection_word is not None:
+            meta.create_dataset("projection_word", data=int(projection_word))
         _write_common_metadata(
             meta,
             wcs_header=wcs_header,

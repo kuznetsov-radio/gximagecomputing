@@ -83,6 +83,9 @@ class EUVRenderOptions:
     response_meta: Any | None = None
     plasma: CoronalPlasmaParameters | None = None
     omp_threads: int = 8
+    parallel: bool = False
+    exact: bool = False
+    projection_threads: int = 0
     geometry: MapGeometry | None = None
     observer: ObserverOverrides | None = None
     save_outputs: bool = True
@@ -158,6 +161,7 @@ class EUVRenderResult:
     geometry: RenderGeometryInfo
     obs_time_iso: str
     response: EUVResponseInfo
+    projection: dict[str, Any]
     plasma: CoronalPlasmaParameters
     flux_corona: np.ndarray
     flux_tr: np.ndarray
@@ -300,6 +304,7 @@ def _euv_result_from_workflow(d: dict[str, Any]) -> EUVRenderResult:
             source=str(resp["source"]),
             mode=str(resp["mode"]),
         ),
+        projection=dict(d.get("projection", {})),
         plasma=_plasma_from_dict(d["plasma"]),
         flux_corona=np.asarray(raw["flux_corona"]),
         flux_tr=np.asarray(raw["flux_tr"]),
@@ -358,6 +363,9 @@ def render_euv_maps(options: EUVRenderOptions) -> EUVRenderResult:
         response_dt=options.response_dt,
         response_meta=options.response_meta,
         omp_threads=int(options.omp_threads),
+        parallel=bool(options.parallel),
+        exact=bool(options.exact),
+        projection_threads=int(options.projection_threads),
         save_outputs=bool(options.save_outputs),
         write_preview=bool(options.write_preview),
         **_geometry_to_kwargs(options.geometry),

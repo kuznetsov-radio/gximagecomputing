@@ -259,6 +259,9 @@ def test_sdk_forwards_named_observer_to_euv_workflow(monkeypatch: pytest.MonkeyP
 
     def fake_run(ns, verbose=False):
         observed["observer"] = getattr(ns, "observer", None)
+        observed["parallel"] = getattr(ns, "parallel", None)
+        observed["exact"] = getattr(ns, "exact", None)
+        observed["projection_threads"] = getattr(ns, "projection_threads", None)
         return {
             "library_path": "/tmp/libgxeuv.dylib",
             "model_path": str(tmp_path / "model.h5"),
@@ -313,9 +316,15 @@ def test_sdk_forwards_named_observer_to_euv_workflow(monkeypatch: pytest.MonkeyP
             model_path=tmp_path / "model.h5",
             model_format="h5",
             observer_name="solo",
+            parallel=True,
+            exact=False,
+            projection_threads=8,
             save_outputs=False,
             write_preview=False,
         )
     )
 
     assert observed["observer"] == "solo"
+    assert observed["parallel"] is True
+    assert observed["exact"] is False
+    assert observed["projection_threads"] == 8
