@@ -11,8 +11,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - EUV rendering accepts `--parallel`, `--exact`, and `--projection-threads`,
   also on `EUVRenderOptions`. Defaults stay off (`parallel=False`,
-  `exact=False`, `projection_threads=0`). The flags are passed to the renderer
-  and stored on the result and in the HDF5 metadata.
+  `exact=False`, `projection_threads=0`). `--projection-threads` must be
+  between 0 and 32767. The flags are passed to the renderer and stored on
+  the result and in the HDF5 metadata.
 
 ### Fixed
 

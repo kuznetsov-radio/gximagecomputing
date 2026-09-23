@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from argparse import Namespace
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
@@ -83,14 +83,14 @@ class EUVRenderOptions:
     response_meta: Any | None = None
     plasma: CoronalPlasmaParameters | None = None
     omp_threads: int = 8
-    parallel: bool = False
-    exact: bool = False
-    projection_threads: int = 0
     geometry: MapGeometry | None = None
     observer: ObserverOverrides | None = None
     save_outputs: bool = True
     write_preview: bool = True
     verbose: bool = False
+    parallel: bool = False
+    exact: bool = False
+    projection_threads: int = 0
 
 
 @dataclass(slots=True)
@@ -161,12 +161,12 @@ class EUVRenderResult:
     geometry: RenderGeometryInfo
     obs_time_iso: str
     response: EUVResponseInfo
-    projection: dict[str, Any]
     plasma: CoronalPlasmaParameters
     flux_corona: np.ndarray
     flux_tr: np.ndarray
     outputs: EUVOutputFiles
     raw_result: dict[str, Any]
+    projection: dict[str, Any] = field(default_factory=dict)
 
 
 def _geometry_to_kwargs(geometry: MapGeometry | None) -> dict:

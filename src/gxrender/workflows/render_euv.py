@@ -410,8 +410,8 @@ def run(args: argparse.Namespace, *, verbose: bool = True) -> dict:
     parallel = bool(getattr(args, "parallel", False))
     exact = bool(getattr(args, "exact", False))
     projection_threads = int(getattr(args, "projection_threads", 0))
-    if projection_threads < 0:
-        raise ValueError("projection_threads must be >= 0")
+    if not 0 <= projection_threads <= 32767:
+        raise ValueError("projection_threads must be between 0 and 32767")
     projection_word = (1 if parallel else 0) | (2 if exact else 0)
     if projection_threads > 0:
         projection_word |= projection_threads << 16

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from argparse import Namespace
+from dataclasses import fields
 from pathlib import Path
 
 import numpy as np
@@ -252,6 +253,7 @@ def test_sdk_result_exposes_response_source_metadata(monkeypatch: pytest.MonkeyP
     assert result.response.channels == ["A171"]
     assert result.response.source == "pyeuvtools-export"
     assert result.response.mode == "pyeuvtools:evenorm_chiantifix"
+    assert result.projection == {}
 
 
 def test_sdk_forwards_named_observer_to_euv_workflow(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -328,3 +330,100 @@ def test_sdk_forwards_named_observer_to_euv_workflow(monkeypatch: pytest.MonkeyP
     assert observed["parallel"] is True
     assert observed["exact"] is False
     assert observed["projection_threads"] == 8
+
+
+def test_euv_dataclasses_keep_projection_fields_at_the_end() -> None:
+    option_names = [item.name for item in fields(gx_sdk.EUVRenderOptions)]
+    assert option_names.index("geometry") < option_names.index("parallel")
+    assert option_names.index("observer") < option_names.index("exact")
+    assert option_names[-3:] == ["parallel", "exact", "projection_threads"]
+
+    result_names = [item.name for item in fields(gx_sdk.EUVRenderResult)]
+    projection = next(item for item in fields(gx_sdk.EUVRenderResult) if item.name == "projection")
+    assert result_names.index("plasma") < result_names.index("projection")
+    assert result_names[-1] == "projection"
+    assert projection.default_factory is dict
+
+
+def test_run_rejects_projection_threads_outside_signed_range(monkeypatch: pytest.MonkeyPatch) -> None:
+    from gxrender.workflows._render_common import CommonRenderInputs, CoronalPlasmaParameters
+
+    common = CommonRenderInputs(
+        model_path=Path("model.h5"),
+        loader="h5",
+        model=object(),
+        model_dt=object(),
+        ebtel_path="",
+        ebtel_c=object(),
+        ebtel_dt=object(),
+        center_source="default",
+        xc=0.0,
+        yc=0.0,
+        dx=1.0,
+        dy=1.0,
+        nx=2,
+        ny=2,
+        fov_x=2.0,
+        fov_y=2.0,
+        model_metadata={},
+        observer_geometry=_observer_geometry(observer_name="earth", observer_source="default"),
+        observer_overrides_applied={},
+    )
+    monkeypatch.setattr(render_euv, "prepare_common_inputs", lambda *args, **kwargs: common)
+    monkeypatch.setattr(render_euv, "apply_default_response_selection", lambda *args, **kwargs: None)
+    monkeypatch.setattr(render_euv, "model_obstime_iso", lambda model: "2020-01-01T00:00:00")
+    monkeypatch.setattr(
+        render_euv,
+        "resolve_euv_response",
+        lambda request: type(
+            "Resolution",
+            (),
+            {
+                "response": object(),
+                "response_dt": object(),
+                "response_meta": EUVResponseMeta(
+                    instrument="AIA",
+                    channels=["A171"],
+                    source="test",
+                    mode="test",
+                ),
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        render_euv,
+        "resolve_plasma_parameters",
+        lambda args: CoronalPlasmaParameters(
+            tbase=1.0e6,
+            nbase=1.0e8,
+            q0=0.0,
+            a=0.0,
+            b=0.0,
+            mode=0,
+            selective_heating=False,
+            shtable=None,
+        ),
+    )
+
+    class _Passed(Exception):
+        pass
+
+    class _FakeComputing:
+        def synth_euv(self, **kwargs):
+            raise _Passed(kwargs["nthreads"])
+
+    monkeypatch.setattr(render_euv, "GXEUVImageComputing", lambda: _FakeComputing())
+
+    for invalid in (-1, 32768):
+        with pytest.raises(ValueError, match="between 0 and 32767"):
+            render_euv.run(
+                Namespace(projection_threads=invalid, save_outputs=False, write_preview=False),
+                verbose=False,
+            )
+
+    with pytest.raises(_Passed) as caught:
+        render_euv.run(
+            Namespace(projection_threads=32767, parallel=True, exact=False, save_outputs=False, write_preview=False),
+            verbose=False,
+        )
+    assert caught.value.args == (32767,)
