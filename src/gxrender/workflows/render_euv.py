@@ -140,6 +140,7 @@ def _resolve_response_inputs(args: argparse.Namespace, *, obs_time_iso: str):
             return build_default_aia_euv_response(
                 obstime=obs_time_iso,
                 channels=None if args.channels is None else [str(channel) for channel in args.channels],
+                correction_state="evenorm_chiantifix",
             )
         except (ImportError, FileNotFoundError) as exc:
             provider_error = exc
@@ -292,6 +293,24 @@ def parse_args() -> argparse.Namespace:
         help="Path to an IDL gxresponse SAV (for example resp_aia_20251126T153431.sav).",
     )
     p.add_argument("--omp-threads", type=int, default=8)
+    p.add_argument(
+        "--parallel",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Use parallel line-of-sight rays (IDL gx_search4bestq-compatible projection).",
+    )
+    p.add_argument(
+        "--exact",
+        action=argparse.BooleanOptionalAction,
+        default=False,
+        help="Use exact rather than approximate line-of-sight geometry.",
+    )
+    p.add_argument(
+        "--projection-threads",
+        type=int,
+        default=0,
+        help="Thread count encoded in the EUV projection word (0 leaves it unset).",
+    )
     p.add_argument("--xc", type=float, default=None)
     p.add_argument("--yc", type=float, default=None)
     p.add_argument("--dsun-cm", type=float, default=None, help="Override model.DSun before rendering (cm).")
@@ -388,11 +407,14 @@ def run(args: argparse.Namespace, *, verbose: bool = True) -> dict:
     response_meta = resolved_response.response_meta
 
     plasma = resolve_plasma_parameters(args)
-    warnings.warn(
-        "Current Python EUV workflow uses projection flags off (parallel=False, exact=False, nthreads=0) for the DLL simbox path. "
-        "This assumption is explicit in the workflow today because high-level projection controls are not exposed yet.",
-        stacklevel=2,
-    )
+    parallel = bool(getattr(args, "parallel", False))
+    exact = bool(getattr(args, "exact", False))
+    projection_threads = int(getattr(args, "projection_threads", 0))
+    if not 0 <= projection_threads <= 32767:
+        raise ValueError("projection_threads must be between 0 and 32767")
+    projection_word = (1 if parallel else 0) | (2 if exact else 0)
+    if projection_threads > 0:
+        projection_word |= projection_threads << 16
 
     gx = GXEUVImageComputing()
     out = gx.synth_euv(
@@ -414,6 +436,9 @@ def run(args: argparse.Namespace, *, verbose: bool = True) -> dict:
         a=plasma.a,
         b=plasma.b,
         mode=plasma.mode,
+        parallel=parallel,
+        exact=exact,
+        nthreads=projection_threads,
         shtable=plasma.shtable,
         warn_defaults=False,
     )
@@ -472,6 +497,10 @@ def run(args: argparse.Namespace, *, verbose: bool = True) -> dict:
             b=plasma.b,
             corona_mode=plasma.mode,
             shtable=plasma.shtable,
+            parallel=parallel,
+            exact=exact,
+            projection_threads=projection_threads,
+            projection_word=projection_word,
         )
         if write_preview:
             _preview_euv(
@@ -499,6 +528,10 @@ def run(args: argparse.Namespace, *, verbose: bool = True) -> dict:
         print(f"Center source: {center_source}")
         print(f"Center used: xc={xc:.3f}, yc={yc:.3f} arcsec")
         print(f"FOV={fov_x:.2f}x{fov_y:.2f} arcsec; N={nx}x{ny}; dx={dx:.2f}, dy={dy:.2f} arcsec")
+        print(
+            "EUV projection: "
+            f"parallel={parallel} exact={exact} nthreads={projection_threads} word={projection_word}"
+        )
         print(
             "Coronal plasma: "
             f"Tbase={plasma.tbase:.6g} K, nbase={plasma.nbase:.6g} cm^-3, "
@@ -575,6 +608,12 @@ def run(args: argparse.Namespace, *, verbose: bool = True) -> dict:
             "channels": [str(c) for c in response_meta.channels],
             "source": str(response_meta.source),
             "mode": str(response_meta.mode),
+        },
+        "projection": {
+            "parallel": parallel,
+            "exact": exact,
+            "nthreads": projection_threads,
+            "word": projection_word,
         },
         "result": out,
         "outputs": {

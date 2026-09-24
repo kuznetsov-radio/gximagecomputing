@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from argparse import Namespace
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Literal, Sequence
 
@@ -88,6 +88,9 @@ class EUVRenderOptions:
     save_outputs: bool = True
     write_preview: bool = True
     verbose: bool = False
+    parallel: bool = False
+    exact: bool = False
+    projection_threads: int = 0
 
 
 @dataclass(slots=True)
@@ -163,6 +166,7 @@ class EUVRenderResult:
     flux_tr: np.ndarray
     outputs: EUVOutputFiles
     raw_result: dict[str, Any]
+    projection: dict[str, Any] = field(default_factory=dict)
 
 
 def _geometry_to_kwargs(geometry: MapGeometry | None) -> dict:
@@ -300,6 +304,7 @@ def _euv_result_from_workflow(d: dict[str, Any]) -> EUVRenderResult:
             source=str(resp["source"]),
             mode=str(resp["mode"]),
         ),
+        projection=dict(d.get("projection", {})),
         plasma=_plasma_from_dict(d["plasma"]),
         flux_corona=np.asarray(raw["flux_corona"]),
         flux_tr=np.asarray(raw["flux_tr"]),
@@ -358,6 +363,9 @@ def render_euv_maps(options: EUVRenderOptions) -> EUVRenderResult:
         response_dt=options.response_dt,
         response_meta=options.response_meta,
         omp_threads=int(options.omp_threads),
+        parallel=bool(options.parallel),
+        exact=bool(options.exact),
+        projection_threads=int(options.projection_threads),
         save_outputs=bool(options.save_outputs),
         write_preview=bool(options.write_preview),
         **_geometry_to_kwargs(options.geometry),

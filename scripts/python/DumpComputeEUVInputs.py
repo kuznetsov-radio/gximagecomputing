@@ -180,6 +180,7 @@ def main() -> None:
                 response, response_dt, response_meta = build_default_aia_euv_response(
                     obstime=model_obstime_iso(common.model),
                     channels=[str(channel) for channel in args.channels],
+                    correction_state="evenorm_chiantifix",
                 )
                 response_source_mode = "python_native"
             except (ImportError, FileNotFoundError) as exc:

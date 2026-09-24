@@ -1,11 +1,13 @@
 from __future__ import annotations
 
 from argparse import Namespace
+from dataclasses import fields
 from pathlib import Path
 
 import numpy as np
 import pytest
 
+from gxrender import euv as gx_euv
 from gxrender import sdk as gx_sdk
 from gxrender.euv import EUVResponseMeta
 from gxrender.geometry.observer_geometry import ResolvedObserverGeometry
@@ -95,13 +97,19 @@ def test_resolve_response_inputs_prefers_python_native_aia_provider(monkeypatch:
         instrument="AIA",
         channels=["A171"],
         source="pyeuvtools-export",
-        mode="pyeuvtools:evenorm",
+        mode="pyeuvtools:evenorm_chiantifix",
     )
+
+    received = {}
+
+    def fake_builder(**kwargs):
+        received.update(kwargs)
+        return payload, response_dt, response_meta
 
     monkeypatch.setattr(
         render_euv,
         "build_default_aia_euv_response",
-        lambda **kwargs: (payload, response_dt, response_meta),
+        fake_builder,
     )
     monkeypatch.setattr(
         render_euv,
@@ -117,6 +125,40 @@ def test_resolve_response_inputs_prefers_python_native_aia_provider(monkeypatch:
     assert response is payload
     assert resolved_dt is response_dt
     assert resolved_meta is response_meta
+    assert received["correction_state"] == "evenorm_chiantifix"
+
+
+def test_default_aia_response_requests_idl_default_corrections(monkeypatch: pytest.MonkeyPatch) -> None:
+    payload = np.zeros(1, dtype=[("ds", np.float64), ("NT", np.int32), ("Nchannels", np.int32)])
+    captured = {}
+
+    class FakeExport:
+        channels = ("94", "131", "171", "193", "211", "304", "335")
+        emissivity_wavelength = np.asarray([10.0])
+        emissivity_logte = np.asarray([6.0])
+        emissivity = np.asarray([[1.0]])
+
+    def fake_payload_builder(**kwargs):
+        captured.update(kwargs)
+        return payload, payload.dtype, {
+            "instrument": "AIA",
+            "channels": tuple(f"A{channel}" for channel in FakeExport.channels),
+        }
+
+    monkeypatch.setattr(
+        gx_euv,
+        "_require_pyeuvtools_aia_bridge",
+        lambda: (fake_payload_builder, lambda path: FakeExport(), lambda: Path("hybrid.sav")),
+    )
+
+    _response, _response_dt, metadata = gx_euv.build_default_aia_euv_response(
+        obstime="2012-07-12T04:46:25.800",
+    )
+
+    assert captured["channels"] == list(FakeExport.channels)
+    assert captured["include_eve_correction"] is True
+    assert captured["include_chiantifix"] is True
+    assert metadata.mode == "pyeuvtools:evenorm_chiantifix"
 
 
 def test_resolve_response_inputs_honors_explicit_response_sav(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -179,7 +221,7 @@ def test_sdk_result_exposes_response_source_metadata(monkeypatch: pytest.MonkeyP
             "instrument": "AIA",
             "channels": ["A171"],
             "source": "pyeuvtools-export",
-            "mode": "pyeuvtools:evenorm",
+            "mode": "pyeuvtools:evenorm_chiantifix",
         },
         "result": {
             "flux_corona": np.zeros((1, 3, 4), dtype=np.float64),
@@ -210,7 +252,8 @@ def test_sdk_result_exposes_response_source_metadata(monkeypatch: pytest.MonkeyP
     assert result.response.instrument == "AIA"
     assert result.response.channels == ["A171"]
     assert result.response.source == "pyeuvtools-export"
-    assert result.response.mode == "pyeuvtools:evenorm"
+    assert result.response.mode == "pyeuvtools:evenorm_chiantifix"
+    assert result.projection == {}
 
 
 def test_sdk_forwards_named_observer_to_euv_workflow(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
@@ -218,6 +261,9 @@ def test_sdk_forwards_named_observer_to_euv_workflow(monkeypatch: pytest.MonkeyP
 
     def fake_run(ns, verbose=False):
         observed["observer"] = getattr(ns, "observer", None)
+        observed["parallel"] = getattr(ns, "parallel", None)
+        observed["exact"] = getattr(ns, "exact", None)
+        observed["projection_threads"] = getattr(ns, "projection_threads", None)
         return {
             "library_path": "/tmp/libgxeuv.dylib",
             "model_path": str(tmp_path / "model.h5"),
@@ -272,9 +318,112 @@ def test_sdk_forwards_named_observer_to_euv_workflow(monkeypatch: pytest.MonkeyP
             model_path=tmp_path / "model.h5",
             model_format="h5",
             observer_name="solo",
+            parallel=True,
+            exact=False,
+            projection_threads=8,
             save_outputs=False,
             write_preview=False,
         )
     )
 
     assert observed["observer"] == "solo"
+    assert observed["parallel"] is True
+    assert observed["exact"] is False
+    assert observed["projection_threads"] == 8
+
+
+def test_euv_dataclasses_keep_projection_fields_at_the_end() -> None:
+    option_names = [item.name for item in fields(gx_sdk.EUVRenderOptions)]
+    assert option_names.index("geometry") < option_names.index("parallel")
+    assert option_names.index("observer") < option_names.index("exact")
+    assert option_names[-3:] == ["parallel", "exact", "projection_threads"]
+
+    result_names = [item.name for item in fields(gx_sdk.EUVRenderResult)]
+    projection = next(item for item in fields(gx_sdk.EUVRenderResult) if item.name == "projection")
+    assert result_names.index("plasma") < result_names.index("projection")
+    assert result_names[-1] == "projection"
+    assert projection.default_factory is dict
+
+
+def test_run_rejects_projection_threads_outside_signed_range(monkeypatch: pytest.MonkeyPatch) -> None:
+    from gxrender.workflows._render_common import CommonRenderInputs, CoronalPlasmaParameters
+
+    common = CommonRenderInputs(
+        model_path=Path("model.h5"),
+        loader="h5",
+        model=object(),
+        model_dt=object(),
+        ebtel_path="",
+        ebtel_c=object(),
+        ebtel_dt=object(),
+        center_source="default",
+        xc=0.0,
+        yc=0.0,
+        dx=1.0,
+        dy=1.0,
+        nx=2,
+        ny=2,
+        fov_x=2.0,
+        fov_y=2.0,
+        model_metadata={},
+        observer_geometry=_observer_geometry(observer_name="earth", observer_source="default"),
+        observer_overrides_applied={},
+    )
+    monkeypatch.setattr(render_euv, "prepare_common_inputs", lambda *args, **kwargs: common)
+    monkeypatch.setattr(render_euv, "apply_default_response_selection", lambda *args, **kwargs: None)
+    monkeypatch.setattr(render_euv, "model_obstime_iso", lambda model: "2020-01-01T00:00:00")
+    monkeypatch.setattr(
+        render_euv,
+        "resolve_euv_response",
+        lambda request: type(
+            "Resolution",
+            (),
+            {
+                "response": object(),
+                "response_dt": object(),
+                "response_meta": EUVResponseMeta(
+                    instrument="AIA",
+                    channels=["A171"],
+                    source="test",
+                    mode="test",
+                ),
+            },
+        )(),
+    )
+    monkeypatch.setattr(
+        render_euv,
+        "resolve_plasma_parameters",
+        lambda args: CoronalPlasmaParameters(
+            tbase=1.0e6,
+            nbase=1.0e8,
+            q0=0.0,
+            a=0.0,
+            b=0.0,
+            mode=0,
+            selective_heating=False,
+            shtable=None,
+        ),
+    )
+
+    class _Passed(Exception):
+        pass
+
+    class _FakeComputing:
+        def synth_euv(self, **kwargs):
+            raise _Passed(kwargs["nthreads"])
+
+    monkeypatch.setattr(render_euv, "GXEUVImageComputing", lambda: _FakeComputing())
+
+    for invalid in (-1, 32768):
+        with pytest.raises(ValueError, match="between 0 and 32767"):
+            render_euv.run(
+                Namespace(projection_threads=invalid, save_outputs=False, write_preview=False),
+                verbose=False,
+            )
+
+    with pytest.raises(_Passed) as caught:
+        render_euv.run(
+            Namespace(projection_threads=32767, parallel=True, exact=False, save_outputs=False, write_preview=False),
+            verbose=False,
+        )
+    assert caught.value.args == (32767,)

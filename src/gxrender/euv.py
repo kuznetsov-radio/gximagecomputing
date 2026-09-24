@@ -113,9 +113,9 @@ def build_default_aia_euv_response(
     *,
     obstime: str,
     channels: list[str] | None = None,
-    correction_state: str = "evenorm",
+    correction_state: str = "evenorm_chiantifix",
 ) -> tuple[np.ndarray, np.dtype, EUVResponseMeta]:
-    """Build the default AIA ComputeEUV response through the released pyEUVTools bridge."""
+    """Build the IDL-default AIA ComputeEUV response through pyEUVTools."""
     build_payload, load_hybrid_export, resolve_hybrid_export_path = _require_pyeuvtools_aia_bridge()
     normalized_correction_state, include_eve_correction, include_chiantifix = _normalize_aia_correction_state(
         correction_state

@@ -5,6 +5,24 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## Unreleased
+
+### Added
+
+- EUV rendering accepts `--parallel`, `--exact`, and `--projection-threads`,
+  also on `EUVRenderOptions`. Defaults stay off (`parallel=False`,
+  `exact=False`, `projection_threads=0`). `--projection-threads` must be
+  between 0 and 32767. The flags are passed to the renderer and stored on
+  the result and in the HDF5 metadata.
+
+### Fixed
+
+- The implicit Python-native AIA response now uses the SolarSoft default
+  correction state, `evenorm_chiantifix`, rather than `evenorm` alone. The
+  normal EUV workflow and ComputeEUV input dumper pin this state explicitly.
+- Default AIA response tests now require all seven export channels, with both
+  EVE normalization and the CHIANTI correction enabled.
+
 ## [0.0.3.0] - 2026-05-20
 
 ### Added
